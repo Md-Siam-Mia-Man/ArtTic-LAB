@@ -53,6 +53,7 @@ manager = ConnectionManager()
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
+        loop = asyncio.get_running_loop()
         while True:
             data = await websocket.receive_json()
             action = data.get("action")
@@ -69,7 +70,10 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 if action == "load_model":
                     result = await asyncio.to_thread(
-                        core.load_model, **payload, progress_callback=progress_callback
+                        core.load_model,
+                        **payload,
+                        progress_callback=progress_callback,
+                        loop=loop,
                     )
                     await websocket.send_json({"type": "model_loaded", "data": result})
 
@@ -79,6 +83,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             core.generate_image,
                             **payload,
                             progress_callback=progress_callback,
+                            loop=loop,
                         )
                         await websocket.send_json(
                             {"type": "generation_complete", "data": result}
