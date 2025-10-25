@@ -276,6 +276,7 @@ body {
      color: var(--slate-700);
      margin-bottom: 0.5rem;
      font-size: 0.8rem;
+     display: block;
 }
 
 .flex-between {
@@ -305,10 +306,9 @@ body {
 
 .form-textarea {
      width: 100%;
-     height: auto;
+     max-height: 250px;
      min-height: 5rem;
      padding: 0.5rem 0.75rem;
-     flex-grow: 1;
      background-color: var(--light-gray);
      border: 1px solid var(--medium-gray);
      border-radius: 0.5rem;
@@ -318,7 +318,7 @@ body {
      font-size: 0.9rem;
      color: var(--slate-800);
      resize: none;
-     overflow-y: hidden;
+     overflow-y: auto;
 }
 
 .form-textarea:focus {
@@ -640,13 +640,19 @@ body {
      justify-content: center;
      overflow: hidden;
      box-shadow: var(--shadow-sm);
+}
+
+.image-preview-wrapper:not(.has-image) {
+     cursor: default;
+}
+
+.image-preview-wrapper.has-image {
      cursor: pointer;
 }
 
 .image-placeholder {
      text-align: center;
      color: var(--dark-gray);
-     cursor: default;
 }
 
 .image-placeholder .material-symbols-outlined {
@@ -672,7 +678,7 @@ body {
      pointer-events: none;
 }
 
-.image-preview-wrapper:hover .image-actions-overlay,
+.image-preview-wrapper.has-image:hover .image-actions-overlay,
 .gallery-item:hover .image-actions-overlay {
      opacity: 1;
      transform: translateY(0);
@@ -841,6 +847,7 @@ body {
      padding: 0.5rem 1rem;
      color: var(--white);
      flex-shrink: 0;
+     background-color: rgba(0, 0, 0, 0.2);
 }
 
 .lightbox-caption {
@@ -848,6 +855,7 @@ body {
      text-overflow: ellipsis;
      white-space: nowrap;
      overflow: hidden;
+     padding-right: 1rem;
 }
 
 .lightbox-actions {
@@ -891,6 +899,7 @@ body {
      max-height: 100%;
      transition: transform 0.2s ease-out;
      will-change: transform;
+     transform-origin: center center;
 }
 
 .lightbox-nav {
@@ -907,12 +916,14 @@ body {
      display: flex;
      align-items: center;
      justify-content: center;
-     transition: background-color 0.2s ease;
+     transition: background-color 0.2s ease, opacity 0.2s ease;
      z-index: 1001;
+     opacity: 0.7;
 }
 
 .lightbox-nav:hover {
      background: rgba(0, 0, 0, 0.5);
+     opacity: 1;
 }
 
 .lightbox-nav.prev {
