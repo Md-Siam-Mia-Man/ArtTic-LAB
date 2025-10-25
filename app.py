@@ -199,6 +199,7 @@ def launch_web_ui():
 if __name__ == "__main__":
     if not args.disable_filters:
         os.system("cls" if os.name == "nt" else "clear")
+    os.makedirs("./outputs", exist_ok=True)
 
     # Log system info once at the start
     log_system_info()
