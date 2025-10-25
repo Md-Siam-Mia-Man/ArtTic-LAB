@@ -26,7 +26,7 @@ def create_ui(available_models, available_loras, schedulers_list, handlers):
         theme=gr.themes.Soft(), css="footer {display: none !important}"
     ) as app:
         gr.Markdown("# ArtTic-LAB")
-        gr.Markdown("ArtTic-LAB v2.0.0")
+        gr.Markdown("ArtTic-LAB v2.5.0")
 
         with gr.Tabs():
             with gr.TabItem("Generate"):

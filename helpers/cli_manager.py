@@ -3,7 +3,7 @@ import logging
 import sys
 
 APP_LOGGER_NAME = "arttic_lab"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.5.0"
 
 
 class ArtTicFilter(logging.Filter):
