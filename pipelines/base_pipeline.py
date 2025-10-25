@@ -5,6 +5,7 @@ import logging
 
 logger = logging.getLogger("arttic_lab")
 
+
 class ArtTicPipeline:
     def __init__(self, model_path, dtype=torch.bfloat16):
         if not torch.xpu.is_available():
@@ -21,7 +22,7 @@ class ArtTicPipeline:
     def place_on_device(self, use_cpu_offload=False):
         if not self.pipe:
             raise RuntimeError("Pipeline must be loaded before placing on device.")
-        
+
         if use_cpu_offload:
             logger.info("Enabling Model CPU Offload for low VRAM usage.")
             self.pipe.enable_model_cpu_offload()
@@ -40,25 +41,30 @@ class ArtTicPipeline:
             return
         if not self.pipe:
             raise RuntimeError("Pipeline must be loaded before optimization.")
-            
-        progress(0.8, desc="Optimizing model with IPEX...")
-        
-        if hasattr(self.pipe, 'unet'):
-            self.pipe.unet = ipex.optimize(self.pipe.unet.eval(), dtype=self.dtype, inplace=True)
+
+        progress(0.8, "Optimizing model with IPEX...")
+
+        if hasattr(self.pipe, "unet"):
+            self.pipe.unet = ipex.optimize(
+                self.pipe.unet.eval(), dtype=self.dtype, inplace=True
+            )
             logger.info("U-Net optimized with IPEX.")
-        elif hasattr(self.pipe, 'transformer'):
-            self.pipe.transformer = ipex.optimize(self.pipe.transformer.eval(), dtype=self.dtype, inplace=True)
+        elif hasattr(self.pipe, "transformer"):
+            self.pipe.transformer = ipex.optimize(
+                self.pipe.transformer.eval(), dtype=self.dtype, inplace=True
+            )
             logger.info("Transformer optimized with IPEX.")
 
-        if hasattr(self.pipe, 'vae'):
-            self.pipe.vae = ipex.optimize(self.pipe.vae.eval(), dtype=self.dtype, inplace=True)
+        if hasattr(self.pipe, "vae"):
+            self.pipe.vae = ipex.optimize(
+                self.pipe.vae.eval(), dtype=self.dtype, inplace=True
+            )
             logger.info("VAE optimized with IPEX.")
-            
+
         self.is_optimized = True
 
     def generate(self, *args, **kwargs):
         if not self.pipe:
             raise RuntimeError("Pipeline not loaded.")
-        # Autocast is still beneficial even with offloading, as the active module is on XPU
         with torch.xpu.amp.autocast(enabled=True, dtype=self.dtype):
             return self.pipe(*args, **kwargs)

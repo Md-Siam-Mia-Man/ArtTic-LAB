@@ -8,14 +8,11 @@ from .base_pipeline import ArtTicPipeline
 
 logger = logging.getLogger("arttic_lab")
 
-# Base Hugging Face repository IDs for FLUX models.
 FLUX_DEV_BASE_REPO = "black-forest-labs/FLUX.1-dev"
 FLUX_SCHNELL_BASE_REPO = "black-forest-labs/FLUX.1-schnell"
 
 
 class ArtTicFLUXPipeline(ArtTicPipeline):
-    """A unified pipeline for both FLUX.1 DEV and FLUX.1 Schnell models."""
-
     def __init__(self, model_path, dtype=torch.bfloat16, is_schnell=False):
         super().__init__(model_path, dtype)
         self.is_schnell = is_schnell
@@ -28,11 +25,8 @@ class ArtTicFLUXPipeline(ArtTicPipeline):
             repo_id = FLUX_DEV_BASE_REPO
             desc = "Loading base FLUX.1 DEV components..."
 
-        progress(0.2, desc=desc)
+        progress(0.2, desc)
         try:
-            # CORRECTED: Removed the 'variant' and 'source_pt_format' arguments
-            # as the official FLUX repos do not use them. The 'torch_dtype'
-            # parameter is sufficient for loading in the correct precision.
             self.pipe = FluxPipeline.from_pretrained(
                 repo_id,
                 torch_dtype=self.dtype,
@@ -54,7 +48,7 @@ class ArtTicFLUXPipeline(ArtTicPipeline):
                 f"Could not download base FLUX components from Hugging Face."
             )
 
-        progress(0.5, desc="Injecting local model weights...")
+        progress(0.5, "Injecting local model weights...")
         self.pipe.load_lora_weights(self.model_path)
         model_type = "Schnell" if self.is_schnell else "DEV"
         logger.info(
