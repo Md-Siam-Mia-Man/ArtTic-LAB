@@ -6,6 +6,7 @@ import random
 import logging
 import math
 import re
+import asyncio
 from glob import glob
 from diffusers import (
     EulerAncestralDiscreteScheduler,
@@ -178,20 +179,12 @@ def _calculate_max_resolution(model_type):
     }.get(model_type, 1.05)
 
     try:
-        # Give a 250MB safety buffer
         effective_free_mem = max(0, free_mem - 0.25)
-
-        # Max megapixels we can generate with the remaining memory
         max_additional_mp = effective_free_mem / vram_per_megapixel
         total_mp = base_res_mp + max_additional_mp
-
-        # Convert megapixels back to a square dimension
         side_length = math.sqrt(total_mp * 1024 * 1024)
-
-        # Round down to the nearest multiple of 64
         max_res = int(side_length // 64 * 64)
-
-        return max(512, min(4096, max_res))  # Clamp to a reasonable range
+        return max(512, min(4096, max_res))
     except Exception:
         return 1024
 
@@ -203,6 +196,7 @@ def load_model(
     cpu_offload,
     lora_name,
     progress_callback=None,
+    loop=None,
 ):
     if not model_name:
         raise ValueError("Please select a model from the dropdown.")
@@ -230,8 +224,8 @@ def load_model(
         }
 
     def update_progress(progress, desc):
-        if progress_callback:
-            progress_callback(progress, desc)
+        if progress_callback and loop:
+            asyncio.run_coroutine_threadsafe(progress_callback(progress, desc), loop)
 
     try:
         if app_state["is_model_loaded"]:
@@ -241,7 +235,7 @@ def load_model(
         update_progress(0, f"Getting pipeline for {model_name}...")
 
         pipe = get_pipeline_for_model(model_name)
-        pipe.load_pipeline(lambda p, d: update_progress(p, d))
+        pipe.load_pipeline(update_progress)
         pipe.place_on_device(use_cpu_offload=cpu_offload)
 
         if lora_name:
@@ -257,7 +251,7 @@ def load_model(
         else:
             app_state["current_lora_name"] = ""
 
-        pipe.optimize_with_ipex(lambda p, d: update_progress(p, d))
+        pipe.optimize_with_ipex(update_progress)
 
         if not isinstance(pipe, (SD3Pipeline, ArtTicFLUXPipeline)):
             logger.info(f"Setting scheduler to: {scheduler_name}")
@@ -277,7 +271,6 @@ def load_model(
             logger.info("VAE Tiling is not applicable for FLUX models.")
 
         app_state["current_vae_tiling_state"] = vae_tiling
-
         app_state["current_pipe"] = pipe
         app_state["current_model_name"] = model_name
         app_state["current_cpu_offload_state"] = cpu_offload
@@ -358,6 +351,7 @@ def generate_image(
     height,
     lora_weight,
     progress_callback=None,
+    loop=None,
 ):
     if not app_state["is_model_loaded"]:
         raise ConnectionAbortedError("Cannot generate, no model is loaded.")
@@ -369,8 +363,11 @@ def generate_image(
 
     def pipeline_progress_callback(pipe, step, timestep, callback_kwargs):
         progress = step / int(steps)
-        if progress_callback:
-            progress_callback(progress, f"Sampling... {step + 1}/{int(steps)}")
+        if progress_callback and loop:
+            asyncio.run_coroutine_threadsafe(
+                progress_callback(progress, f"Sampling... {step + 1}/{int(steps)}"),
+                loop,
+            )
         return callback_kwargs
 
     gen_kwargs = {
