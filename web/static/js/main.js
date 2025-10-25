@@ -5,6 +5,9 @@ document.addEventListener("DOMContentLoaded", () => {
     isModelLoaded: false,
     isBusy: false,
     modelType: "SD 1.5",
+    currentModelName: null,
+    currentLoraName: "None",
+    currentCpuOffload: false,
     socket: null,
     galleryImages: [],
     currentLightboxIndex: -1,
@@ -97,8 +100,8 @@ document.addEventListener("DOMContentLoaded", () => {
       cpuOffloadCheckbox: document.getElementById("cpu-offload-checkbox"),
     },
     generate: {
-      btn: document.getElementById("generate-btn"),
       wrapper: document.getElementById("image-preview-wrapper"),
+      btn: document.getElementById("generate-btn"),
       outputImage: document.getElementById("output-image"),
       imagePlaceholder: document.getElementById("image-placeholder"),
       infoText: document.getElementById("info-text"),
@@ -164,9 +167,13 @@ document.addEventListener("DOMContentLoaded", () => {
     model_loaded: (data) => {
       state.isModelLoaded = true;
       state.modelType = data.model_type;
+      state.currentModelName = ui.model.dropdown.dataset.value;
+      state.currentLoraName = ui.lora.dropdown.dataset.value;
+      state.currentCpuOffload = ui.params.cpuOffloadCheckbox.checked;
       updateStatus(data.status_message, "ready");
       setDimensions(data.width, data.height);
       setBusyState(false);
+      updateLoadButtonState();
     },
     generation_complete: (data) => {
       const imageUrl = `/outputs/${data.image_filename}?t=${Date.now()}`;
@@ -174,14 +181,19 @@ document.addEventListener("DOMContentLoaded", () => {
       ui.generate.downloadBtn.href = imageUrl;
       ui.generate.openNewTabBtn.href = imageUrl;
       ui.generate.outputImage.classList.remove("hidden");
+      ui.generate.wrapper.classList.add("has-image");
       ui.generate.imagePlaceholder.classList.add("hidden");
       ui.generate.infoText.textContent = data.info;
       setBusyState(false);
     },
     model_unloaded: (data) => {
       state.isModelLoaded = false;
+      state.currentModelName = null;
+      state.currentLoraName = "None";
+      state.currentCpuOffload = false;
       updateStatus(data.status_message, "unloaded");
       setBusyState(false);
+      updateLoadButtonState();
     },
     progress_update: (data) => {
       showProgressBar(true);
@@ -194,6 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
     error: (data) => {
       alert(`An error occurred: ${data.message}`);
       setBusyState(false);
+      updateLoadButtonState();
     },
   };
 
@@ -210,17 +223,33 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!isBusy) showProgressBar(false);
 
     ui.busyControls.forEach((el) => {
-      if (el.classList.contains("custom-dropdown")) {
-        el.classList.toggle("disabled", isBusy);
-      } else {
-        el.disabled = isBusy;
-      }
+      const isDisabled = el.classList.contains("custom-dropdown")
+        ? "disabled"
+        : "disabled";
+      el.classList.toggle(isDisabled, isBusy);
+      if (el.tagName !== "DIV") el.disabled = isBusy;
     });
 
     if (!isBusy) {
       ui.model.unloadBtn.disabled = !state.isModelLoaded;
       ui.generate.btn.disabled = !state.isModelLoaded;
+      updateLoadButtonState();
     }
+  }
+
+  function updateLoadButtonState() {
+    if (state.isBusy) return;
+    const selectedModel = ui.model.dropdown.dataset.value;
+    const selectedLora = ui.lora.dropdown.dataset.value;
+    const selectedOffload = ui.params.cpuOffloadCheckbox.checked;
+
+    const isSameConfig =
+      state.isModelLoaded &&
+      selectedModel === state.currentModelName &&
+      selectedLora === state.currentLoraName &&
+      selectedOffload === state.currentCpuOffload;
+
+    ui.model.loadBtn.disabled = isSameConfig;
   }
 
   function updateStatus(message, statusClass) {
@@ -309,7 +338,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function openLightbox(index) {
-    state.currentLightboxIndex = index;
     showLightboxImage(index);
     ui.lightbox.container.classList.remove("hidden");
     resetZoomAndPan();
@@ -320,10 +348,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showLightboxImage(index) {
-    const isGallery = typeof index === "number";
+    const isFromGallery = typeof index === "number";
     let imageUrl, caption;
 
-    if (isGallery) {
+    if (isFromGallery) {
       if (index < 0 || index >= state.galleryImages.length) return;
       state.currentLightboxIndex = index;
       caption = state.galleryImages[index];
@@ -331,6 +359,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ui.lightbox.prevBtn.style.display = "block";
       ui.lightbox.nextBtn.style.display = "block";
     } else {
+      state.currentLightboxIndex = -1; // Not in gallery
       imageUrl = ui.generate.outputImage.src;
       caption = "Generated Image";
       ui.lightbox.prevBtn.style.display = "none";
@@ -339,6 +368,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     ui.lightbox.img.src = imageUrl;
     ui.lightbox.caption.textContent = caption;
+    resetZoomAndPan();
   }
 
   function updateImageTransform() {
@@ -366,7 +396,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const updateFunc = () => {
         if (valueDisplay)
           valueDisplay.textContent =
-            slider.value + (slider.id.includes("px") ? "px" : "");
+            slider.value +
+            (slider.id.includes("width") || slider.id.includes("height")
+              ? "px"
+              : "");
         updateSliderBackground(slider);
       };
       slider.addEventListener("input", updateFunc);
@@ -375,12 +408,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.querySelectorAll(".form-textarea").forEach((textarea) => {
       textarea.addEventListener("input", () => autoResizeTextarea(textarea));
+      textarea.addEventListener("focus", () => autoResizeTextarea(textarea));
       autoResizeTextarea(textarea);
     });
 
     ui.nav.links.forEach((link) => {
       link.addEventListener("click", (e) => {
         e.preventDefault();
+        if (state.isBusy && link.dataset.target !== "gallery") return;
         ui.nav.links.forEach((l) => l.classList.remove("active"));
         link.classList.add("active");
         Object.values(ui.pages).forEach((page) => page.classList.add("hidden"));
@@ -407,6 +442,16 @@ document.addEventListener("DOMContentLoaded", () => {
       updateStatus("Unloading model...", "busy");
       sendMessage("unload_model");
     });
+
+    [ui.model.dropdown, ui.lora.dropdown].forEach((el) =>
+      el.addEventListener("click", (e) => {
+        if (e.target.tagName === "LI") updateLoadButtonState();
+      })
+    );
+    ui.params.cpuOffloadCheckbox.addEventListener(
+      "change",
+      updateLoadButtonState
+    );
 
     ui.generate.btn.addEventListener("click", () => {
       setBusyState(true);
@@ -446,9 +491,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/api/config");
       const config = await response.json();
       if (type === "models")
-        createCustomDropdown(ui.model.dropdown, config.models);
+        createCustomDropdown(
+          ui.model.dropdown,
+          config.models,
+          updateLoadButtonState
+        );
       else if (type === "loras")
-        createCustomDropdown(ui.lora.dropdown, ["None", ...config.loras]);
+        createCustomDropdown(
+          ui.lora.dropdown,
+          ["None", ...config.loras],
+          updateLoadButtonState
+        );
     };
 
     ui.model.refreshBtn.addEventListener("click", () =>
@@ -461,13 +514,16 @@ document.addEventListener("DOMContentLoaded", () => {
         .then((config) => populateGallery(config.gallery_images))
     );
 
-    ui.generate.wrapper.addEventListener("click", () => {
-      if (!ui.generate.outputImage.classList.contains("hidden"))
+    ui.generate.wrapper.addEventListener("click", (e) => {
+      if (
+        e.target !== ui.generate.viewBtn &&
+        ui.generate.wrapper.classList.contains("has-image")
+      )
         openLightbox(null);
     });
     ui.generate.viewBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (!ui.generate.outputImage.classList.contains("hidden"))
+      if (ui.generate.wrapper.classList.contains("has-image"))
         openLightbox(null);
     });
 
@@ -492,12 +548,13 @@ document.addEventListener("DOMContentLoaded", () => {
     ui.lightbox.fitBtn.addEventListener("click", resetZoomAndPan);
 
     ui.lightbox.imageWrapper.addEventListener("mousedown", (e) => {
-      if (e.button !== 0 || state.zoomLevel <= 1) return;
+      if (e.button !== 0) return;
       state.isPanning = true;
       state.panStart = {
         x: e.clientX - state.panCurrent.x,
         y: e.clientY - state.panCurrent.y,
       };
+      ui.lightbox.imageWrapper.style.cursor = "grabbing";
     });
     window.addEventListener("mousemove", (e) => {
       if (!state.isPanning) return;
@@ -509,6 +566,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     window.addEventListener("mouseup", () => {
       state.isPanning = false;
+      ui.lightbox.imageWrapper.style.cursor = "grab";
     });
   }
 
@@ -518,22 +576,28 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
       const config = await response.json();
-      createCustomDropdown(ui.model.dropdown, config.models);
-      createCustomDropdown(ui.model.samplerDropdown, config.schedulers);
-      createCustomDropdown(ui.lora.dropdown, ["None", ...config.loras]);
-      populateGallery(config.gallery_images);
-      ui.busyControls = [
-        ...document.querySelectorAll("button"),
-        ...document.querySelectorAll("input"),
-        ...document.querySelectorAll("textarea"),
-        ...document.querySelectorAll(".custom-dropdown"),
-      ].filter(
-        (el) =>
-          !el.closest(
-            ".nav-links, .gallery-header, .gallery-grid, .image-actions-overlay, .lightbox"
-          )
+      createCustomDropdown(
+        ui.model.dropdown,
+        config.models,
+        updateLoadButtonState
       );
+      createCustomDropdown(ui.model.samplerDropdown, config.schedulers);
+      createCustomDropdown(
+        ui.lora.dropdown,
+        ["None", ...config.loras],
+        updateLoadButtonState
+      );
+      populateGallery(config.gallery_images);
+
+      const generationControls = document
+        .getElementById("page-generate")
+        .querySelectorAll("button, input, textarea, .custom-dropdown");
+      ui.busyControls = Array.from(generationControls).filter(
+        (el) => !el.closest(".image-actions-overlay")
+      );
+
       setBusyState(false);
+      updateLoadButtonState();
     } catch (error) {
       console.error("Failed to fetch initial config:", error);
       alert("Could not load configuration from the server. Please refresh.");
