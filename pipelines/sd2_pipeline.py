@@ -2,6 +2,7 @@
 from diffusers import StableDiffusionPipeline
 from .base_pipeline import ArtTicPipeline
 
+
 class SD2Pipeline(ArtTicPipeline):
     def load_pipeline(self, progress):
         progress(0.2, "Loading StableDiffusionPipeline (v2)...")
@@ -9,5 +10,6 @@ class SD2Pipeline(ArtTicPipeline):
             self.model_path,
             torch_dtype=self.dtype,
             use_safetensors=True,
-            safety_checker=None
+            safety_checker=None,
+            progress_bar_config={"disable": True},
         )

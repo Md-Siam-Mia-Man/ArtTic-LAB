@@ -17,6 +17,7 @@ class SD3Pipeline(ArtTicPipeline):
                 SD3_BASE_MODEL_REPO,
                 torch_dtype=self.dtype,
                 use_safetensors=True,
+                progress_bar_config={"disable": True},
             )
         except Exception as e:
             logger.error(

@@ -12,4 +12,5 @@ class SDXLPipeline(ArtTicPipeline):
             use_safetensors=True,
             variant="fp16",
             safety_checker=None,
+            progress_bar_config={"disable": True},
         )

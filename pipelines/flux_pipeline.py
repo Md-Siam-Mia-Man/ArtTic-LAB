@@ -31,6 +31,7 @@ class ArtTicFLUXPipeline(ArtTicPipeline):
                 repo_id,
                 torch_dtype=self.dtype,
                 use_safetensors=True,
+                progress_bar_config={"disable": True},
             )
         except GatedRepoError as e:
             logger.error(

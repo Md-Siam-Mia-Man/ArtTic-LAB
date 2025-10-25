@@ -11,4 +11,5 @@ class SD15Pipeline(ArtTicPipeline):
             torch_dtype=self.dtype,
             use_safetensors=True,
             safety_checker=None,
+            progress_bar_config={"disable": True},
         )
