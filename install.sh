@@ -1,164 +1,210 @@
 #!/bin/bash
-# ArtTic-LAB Installer for Linux/macOS
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
 
 # --- Configuration ---
 ENV_NAME="ArtTic-LAB"
-PYTHON_VERSIONS_TO_TRY="3.11 3.12 3.10"
+PYTHON_VERSION="3.11"
 
-# --- Functions ---
-print_header() {
-    clear
-    echo "======================================================="
-    echo "            ArtTic-LAB Installer"
-    echo "======================================================="
-    echo ""
-    echo "This script will find your Conda installation and"
-    echo "prepare the '$ENV_NAME' environment."
-    echo ""
-}
+# --- Colors for better output ---
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# --- Subroutines / Functions ---
 
 find_conda() {
+    # This robustly finds Conda by checking common paths and initializing the shell.
+    # It will prompt the user if multiple installations are found.
+    echo -e "[INFO] Searching for Conda installation..."
+
+    # 1. Best case: Conda is already available in the shell
     if command -v conda &> /dev/null; then
-        CONDA_BASE_PATH=$(conda info --base) && return 0
+        echo -e "${GREEN}[SUCCESS] Conda is already initialized in this shell.${NC}"
+        # Initialize for the current script session
+        eval "$(conda shell.bash hook)"
+        return 0
     fi
-    local common_paths=("$HOME/miniconda3" "$HOME/anaconda3" "/opt/miniconda3" "/opt/anaconda3")
-    for path in "${common_paths[@]}"; do
-        if [ -f "$path/bin/conda" ]; then
-            CONDA_BASE_PATH="$path" && return 0
-        fi
-    done
-    return 1
+
+    # 2. Search for Conda installations and store their paths
+    declare -a conda_paths
+    # Common user paths
+    [ -f "$HOME/miniconda3/bin/conda" ]   && conda_paths+=("$HOME/miniconda3")
+    [ -f "$HOME/anaconda3/bin/conda" ]    && conda_paths+=("$HOME/anaconda3")
+    [ -f "$HOME/miniforge3/bin/conda" ]   && conda_paths+=("$HOME/miniforge3")
+    # Common system paths
+    [ -f "/opt/miniconda3/bin/conda" ]    && conda_paths+=("/opt/miniconda3")
+    [ -f "/opt/anaconda3/bin/conda" ]     && conda_paths+=("/opt/anaconda3")
+    [ -f "/opt/miniforge3/bin/conda" ]    && conda_paths+=("/opt/miniforge3")
+
+    local conda_count=${#conda_paths[@]}
+
+    # 3. Process the findings
+    if [ "$conda_count" -eq 0 ]; then
+        return 1 # Failure
+    fi
+
+    local conda_path
+    if [ "$conda_count" -eq 1 ]; then
+        # Exactly one installation found, use it automatically
+        conda_path="${conda_paths[0]}"
+        echo -e "${GREEN}[SUCCESS] Found single Conda installation at: ${conda_path}${NC}"
+    else
+        # Multiple installations found, prompt user to choose
+        echo -e "\n${YELLOW}[WARNING] Multiple Conda installations detected. Please choose which one to use:${NC}"
+        for i in "${!conda_paths[@]}"; do
+            echo "  $((i+1)). ${conda_paths[$i]}"
+        done
+        echo ""
+
+        local choice
+        while true; do
+            read -p "Enter your choice (1-${conda_count}): " choice
+            if [[ "$choice" -ge 1 && "$choice" -le "$conda_count" ]]; then
+                conda_path="${conda_paths[$((choice-1))]}"
+                echo -e "[INFO] You selected: ${conda_path}"
+                break
+            else
+                echo -e "${RED}Invalid choice. Please try again.${NC}"
+            fi
+        done
+    fi
+
+    # 4. Initialize the chosen Conda environment
+    local conda_executable="${conda_path}/bin/conda"
+    if [ ! -f "$conda_executable" ]; then
+        echo -e "${RED}[ERROR] Could not find 'conda' executable in the selected path: ${conda_path}${NC}"
+        return 1
+    fi
+    echo -e "[INFO] Initializing Conda from: ${conda_path}"
+    # The 'eval' command correctly sets up Conda for the rest of the script
+    eval "$($conda_executable shell.bash hook)"
 }
 
 create_environment() {
-    local py_ver=$1
-    echo ""
-    echo "-------------------------------------------------------"
-    echo "[ATTEMPT] Trying to create environment with Python $py_ver..."
-    echo "-------------------------------------------------------"
-    echo "[INFO] Removing any previous version of '$ENV_NAME'..."
-    conda env remove --name "$ENV_NAME" -y &> /dev/null
-    echo "[INFO] Creating new Conda environment..."
-    conda create --name "$ENV_NAME" python="$py_ver" -y
-    if [ $? -ne 0 ]; then
-        echo "[ERROR] Failed to create Conda environment with Python $py_ver." >&2
-        return 1
-    fi
-    return 0
-}
-
-install_packages() {
-    echo ""
-    echo "[INFO] Activating environment and installing/updating dependencies..."
-    echo "This is the longest step. Please be patient."
-    conda activate "$ENV_NAME"
-    if [ $? -ne 0 ]; then echo "[ERROR] Failed to activate '$ENV_NAME'." >&2; return 1; fi
-
-    echo "[INFO] Upgrading pip..."
-    python -m pip install --upgrade pip --quiet
-    if [ $? -ne 0 ]; then echo "[ERROR] Failed to upgrade pip." >&2; return 1; fi
-
-    echo ""
-    echo "Please select your hardware for PyTorch installation:"
-    select hardware in "NVIDIA (CUDA)" "Apple Silicon (M1/M2/M3)" "Intel GPU (XPU)" "CPU only"; do
-        case $hardware in
-            "NVIDIA (CUDA)") pip install torch torchvision torchaudio; break;;
-            "Apple Silicon (M1/M2/M3)") pip install torch torchvision torchaudio; break;;
-            "Intel GPU (XPU)") pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/xpu; pip install intel-extension-for-pytorch --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/; break;;
-            "CPU only") pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu; break;;
-            *) echo "Invalid choice. Please enter a number from 1-4.";;
-        esac
-    done
-    if [ $? -ne 0 ]; then echo "[ERROR] PyTorch installation failed." >&2; return 1; fi
-
-    echo "[INFO] Installing other dependencies from requirements.txt..."
-    # UPDATED: Using requirements.txt for consistency with the .bat script
-    pip install -r requirements.txt
-    if [ $? -ne 0 ]; then echo "[ERROR] Installation of other dependencies failed." >&2; return 1; fi
-
-    return 0
+    echo -e "\n-------------------------------------------------------"
+    echo -e "[INFO] Creating Conda environment with Python ${PYTHON_VERSION}..."
+    echo -e "-------------------------------------------------------"
+    
+    echo -e "[INFO] Removing any previous version of '${ENV_NAME}'..."
+    # Suppress output, we don't care if it fails (doesn't exist)
+    conda env remove --name "${ENV_NAME}" -y &>/dev/null || true
+    
+    echo -e "[INFO] Creating new Conda environment..."
+    conda create --name "${ENV_NAME}" python=${PYTHON_VERSION} -y
 }
 
 handle_hf_login() {
-    echo ""
-    echo "-------------------------------------------------------"
-    echo "[ACTION REQUIRED] Hugging Face Login"
-    echo "-------------------------------------------------------"
+    echo -e "\n-------------------------------------------------------"
+    echo -e "${YELLOW}[ACTION REQUIRED] Hugging Face Login${NC}"
+    echo -e "-------------------------------------------------------"
     echo "Models like SD3 and FLUX require you to be logged into"
     echo "your Hugging Face account to download base files."
     echo ""
-    read -p "Would you like to log in now? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+
+    read -p "Would you like to log in now? (y/n): " login_choice
+    if [[ "${login_choice,,}" == "y" ]]; then
         echo ""
-        echo "[INFO] Please get your Hugging Face User Access Token here:"
-        echo "       https://huggingface.co/settings/tokens"
-        echo "[INFO] The token needs at least 'read' permissions."
+        echo -e "[INFO] Please get your Hugging Face User Access Token here:"
+        echo -e "       https://huggingface.co/settings/tokens"
+        echo -e "[INFO] The token needs at least 'read' permissions."
         echo ""
         huggingface-cli login
         echo ""
-        echo "[IMPORTANT] Remember to visit the model pages on the"
-        echo "Hugging Face website to accept their license agreements:"
-        echo "- SD3: https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers"
-        echo "- FLUX: https://huggingface.co/black-forest-labs/FLUX.1-dev"
+        echo -e "${YELLOW}[IMPORTANT] Remember to visit the model pages on the"
+        echo -e "Hugging Face website to accept their license agreements:${NC}"
+        echo -e "- SD3: https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers"
+        echo -e "- FLUX: https://huggingface.co/black-forest-labs/FLUX.1-dev"
         echo ""
     else
         echo ""
-        echo "[INFO] Skipping Hugging Face login."
-        echo "You can log in later by activating the environment"
-        echo "('conda activate ArtTic-LAB') and running 'huggingface-cli login'."
-        echo "Note: SD3 and FLUX models will not work until you do."
+        echo -e "[INFO] Skipping Hugging Face login."
+        echo -e "You can log in later by opening a terminal, running"
+        echo -e "'conda activate ${ENV_NAME}' and then 'huggingface-cli login'."
+        echo -e "${YELLOW}Note: SD3 and FLUX models will not work until you do.${NC}"
     fi
 }
 
 # --- Main Script ---
-print_header
+clear
+echo "======================================================="
+echo "            ArtTic-LAB Installer for Linux"
+echo "======================================================="
+echo ""
+echo "This script will find your Conda installation and prepare"
+echo "the '${ENV_NAME}' environment."
+echo ""
 
 # 1. Find and initialize Conda
-echo "[INFO] Searching for Conda installation..."
-if ! find_conda; then echo "[ERROR] Conda not found." >&2; exit 1; fi
-echo "[SUCCESS] Conda installation detected at: $CONDA_BASE_PATH"
-source "${CONDA_BASE_PATH}/etc/profile.d/conda.sh"
-
-# 2. Handle environment creation
-CREATE_ENV=true
-if conda env list | grep -q "^${ENV_NAME} "; then
-    read -p "[WARNING] Environment '$ENV_NAME' already exists. Reinstall? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "[INFO] Skipping environment creation. Will update packages in the existing environment."
-        CREATE_ENV=false
-    fi
-fi
-
-if [ "$CREATE_ENV" = true ]; then
-    ENV_CREATED=false
-    for py_version in $PYTHON_VERSIONS_TO_TRY; do
-        if create_environment "$py_version"; then
-            ENV_CREATED=true
-            break
-        fi
-    done
-    if [ "$ENV_CREATED" = false ]; then
-        echo ""
-        echo "[FATAL ERROR] Could not create the Conda environment after trying all Python versions." >&2
-        exit 1
-    fi
-fi
-
-# 3. Install packages
-if install_packages; then
-    handle_hf_login
-
-    echo ""
-    echo "======================================================="
-    echo "[SUCCESS] Installation complete!"
-    echo "You can now run './start.sh' to launch ArtTic-LAB."
-    echo "======================================================="
-    echo ""
-    exit 0
-else
-    echo ""
-    echo "[FATAL ERROR] Package installation failed. Please check the errors above." >&2
+if ! find_conda; then
+    echo -e "${RED}[ERROR] Conda installation not found. Please ensure Miniconda, Anaconda, or Miniforge is installed.${NC}"
     exit 1
 fi
+
+# 2. Handle environment creation
+echo ""
+echo -e "[INFO] Checking for existing '${ENV_NAME}' environment..."
+if conda env list | grep -E "^${ENV_NAME} " &>/dev/null; then
+    echo -e "${YELLOW}[WARNING] Environment '${ENV_NAME}' already exists.${NC}"
+    read -p "Do you want to remove and reinstall it? (y/n): " reinstall
+    if [[ "${reinstall,,}" != "y" ]]; then
+        echo -e "[INFO] Skipping environment creation. Will update packages."
+    else
+        create_environment
+    fi
+else
+    create_environment
+fi
+
+# 3. Activate environment and install packages
+echo ""
+echo -e "[INFO] Activating environment and installing/updating dependencies..."
+echo "This is the longest step. Please be patient."
+conda activate "${ENV_NAME}"
+
+echo -e "[INFO] Upgrading pip..."
+python -m pip install --upgrade pip --quiet
+
+echo ""
+echo "Please select your hardware for PyTorch installation:"
+echo "  1. NVIDIA (CUDA)"
+echo "  2. Intel GPU (XPU) - Experimental on Linux"
+echo "  3. CPU only"
+echo ""
+read -p "Enter your choice (1, 2, or 3): " hardware_choice
+
+case "$hardware_choice" in
+    1)
+        # For Linux, it's often better to specify the CUDA version via conda or find-links
+        # This generic command works for recent CUDA toolkits.
+        pip install torch torchvision torchaudio
+        ;;
+    2)
+        pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/xpu
+        pip install intel-extension-for-pytorch==2.8.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+        ;;
+    3)
+        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        pip install intel-extension-for-pytorch --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
+        ;;
+    *)
+        echo -e "${RED}[ERROR] Invalid choice. Aborting.${NC}"
+        exit 1
+        ;;
+esac
+
+echo -e "[INFO] Installing other dependencies from requirements.txt..."
+pip install -r requirements.txt
+
+# 4. Handle Hugging Face Login
+handle_hf_login
+
+echo ""
+echo "======================================================="
+echo -e "${GREEN}[SUCCESS] Installation complete!${NC}"
+echo "You can now run 'start.sh' to launch ArtTic-LAB."
+echo "======================================================="
+echo ""
+exit 0
