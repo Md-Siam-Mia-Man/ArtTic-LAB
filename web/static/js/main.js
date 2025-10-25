@@ -1,13 +1,19 @@
 // web/static/js/main.js
 
 document.addEventListener("DOMContentLoaded", () => {
-  // --- Application State & Constants ---
   const state = {
     isModelLoaded: false,
     isBusy: false,
     modelType: "SD 1.5",
     socket: null,
+    galleryImages: [],
+    currentLightboxIndex: -1,
+    zoomLevel: 1,
+    isPanning: false,
+    panStart: { x: 0, y: 0 },
+    panCurrent: { x: 0, y: 0 },
   };
+
   const ASPECT_RATIOS = {
     "SD 1.5": {
       "1:1": [512, 512],
@@ -33,7 +39,6 @@ document.addEventListener("DOMContentLoaded", () => {
       "3:2": [1216, 832],
       "16:9": [1344, 768],
     },
-    // NEW: Add FLUX model resolutions. They share the same defaults as SDXL/SD3.
     "FLUX Dev": {
       "1:1": [1024, 1024],
       "4:3": [1152, 896],
@@ -48,7 +53,6 @@ document.addEventListener("DOMContentLoaded", () => {
     },
   };
 
-  // --- DOM Element Cache (Complete) ---
   const ui = {
     nav: { links: document.querySelectorAll(".nav-link") },
     pages: {
@@ -94,9 +98,11 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     generate: {
       btn: document.getElementById("generate-btn"),
+      wrapper: document.getElementById("image-preview-wrapper"),
       outputImage: document.getElementById("output-image"),
       imagePlaceholder: document.getElementById("image-placeholder"),
       infoText: document.getElementById("info-text"),
+      viewBtn: document.getElementById("view-btn"),
       downloadBtn: document.getElementById("download-btn"),
       openNewTabBtn: document.getElementById("open-new-tab-btn"),
     },
@@ -115,11 +121,17 @@ document.addEventListener("DOMContentLoaded", () => {
       container: document.getElementById("lightbox"),
       closeBtn: document.getElementById("lightbox-close"),
       img: document.getElementById("lightbox-img"),
+      imageWrapper: document.getElementById("lightbox-image-wrapper"),
       caption: document.getElementById("lightbox-caption"),
+      prevBtn: document.getElementById("lightbox-prev"),
+      nextBtn: document.getElementById("lightbox-next"),
+      zoomInBtn: document.getElementById("lightbox-zoom-in"),
+      zoomOutBtn: document.getElementById("lightbox-zoom-out"),
+      fitBtn: document.getElementById("lightbox-fit"),
     },
+    busyControls: [],
   };
 
-  // --- WebSocket Communication ---
   function connectWebSocket() {
     const url = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${
       window.location.host
@@ -192,17 +204,19 @@ document.addEventListener("DOMContentLoaded", () => {
     )(data);
   }
 
-  // --- UI Update & Control Functions ---
   function setBusyState(isBusy) {
     state.isBusy = isBusy;
     document.body.style.cursor = isBusy ? "wait" : "default";
     if (!isBusy) showProgressBar(false);
-    document
-      .querySelectorAll("button, input, textarea, .custom-dropdown")
-      .forEach((el) => {
+
+    ui.busyControls.forEach((el) => {
+      if (el.classList.contains("custom-dropdown")) {
         el.classList.toggle("disabled", isBusy);
-        if (el.tagName !== "DIV") el.disabled = isBusy; // Don't disable divs
-      });
+      } else {
+        el.disabled = isBusy;
+      }
+    });
+
     if (!isBusy) {
       ui.model.unloadBtn.disabled = !state.isModelLoaded;
       ui.generate.btn.disabled = !state.isModelLoaded;
@@ -215,9 +229,8 @@ document.addEventListener("DOMContentLoaded", () => {
       { ready: "memory", unloaded: "memory_off", busy: "hourglass_top" }[
         statusClass
       ] || "memory";
-    const className = `material-symbols-outlined icon-${statusClass}`;
     ui.status.icon.textContent = iconName;
-    ui.status.icon.className = className;
+    ui.status.icon.className = `material-symbols-outlined icon-${statusClass}`;
   }
 
   function showProgressBar(show) {
@@ -235,7 +248,11 @@ document.addEventListener("DOMContentLoaded", () => {
     ui.params.heightSlider.dispatchEvent(new Event("input"));
   }
 
-  // --- Custom Components ---
+  function autoResizeTextarea(textarea) {
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }
+
   function createCustomDropdown(container, options, onSelect) {
     const initialValue = options[0] || "No options";
     container.innerHTML = `<div class="dropdown-selected" tabindex="0"><span class="selected-text">${initialValue}</span></div><ul class="dropdown-options"></ul>`;
@@ -272,11 +289,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function populateGallery(images) {
+    state.galleryImages = images || [];
     ui.gallery.grid.innerHTML = "";
-    const hasImages = images?.length > 0;
+    const hasImages = state.galleryImages.length > 0;
     ui.gallery.placeholder.classList.toggle("hidden", hasImages);
     if (hasImages) {
-      images.forEach((imageFile) => {
+      state.galleryImages.forEach((imageFile, index) => {
         const item = document.createElement("div");
         item.className = "gallery-item";
         const imageUrl = `/outputs/${imageFile}`;
@@ -284,16 +302,53 @@ document.addEventListener("DOMContentLoaded", () => {
         item
           .querySelector(".image-actions-overlay")
           .addEventListener("click", (e) => e.stopPropagation());
-        item.addEventListener("click", () => openLightbox(imageUrl, imageFile));
+        item.addEventListener("click", () => openLightbox(index));
         ui.gallery.grid.appendChild(item);
       });
     }
   }
 
-  function openLightbox(src, caption) {
-    ui.lightbox.img.src = src;
-    ui.lightbox.caption.textContent = caption;
+  function openLightbox(index) {
+    state.currentLightboxIndex = index;
+    showLightboxImage(index);
     ui.lightbox.container.classList.remove("hidden");
+    resetZoomAndPan();
+  }
+
+  function closeLightbox() {
+    ui.lightbox.container.classList.add("hidden");
+  }
+
+  function showLightboxImage(index) {
+    const isGallery = typeof index === "number";
+    let imageUrl, caption;
+
+    if (isGallery) {
+      if (index < 0 || index >= state.galleryImages.length) return;
+      state.currentLightboxIndex = index;
+      caption = state.galleryImages[index];
+      imageUrl = `/outputs/${caption}`;
+      ui.lightbox.prevBtn.style.display = "block";
+      ui.lightbox.nextBtn.style.display = "block";
+    } else {
+      imageUrl = ui.generate.outputImage.src;
+      caption = "Generated Image";
+      ui.lightbox.prevBtn.style.display = "none";
+      ui.lightbox.nextBtn.style.display = "none";
+    }
+
+    ui.lightbox.img.src = imageUrl;
+    ui.lightbox.caption.textContent = caption;
+  }
+
+  function updateImageTransform() {
+    ui.lightbox.img.style.transform = `translate(${state.panCurrent.x}px, ${state.panCurrent.y}px) scale(${state.zoomLevel})`;
+  }
+
+  function resetZoomAndPan() {
+    state.zoomLevel = 1;
+    state.panCurrent = { x: 0, y: 0 };
+    updateImageTransform();
   }
 
   function updateSliderBackground(slider) {
@@ -304,24 +359,23 @@ document.addEventListener("DOMContentLoaded", () => {
     slider.style.backgroundSize = `${percentage}% 100%`;
   }
 
-  // --- Event Listeners Setup ---
   function setupEventListeners() {
     document.querySelectorAll(".range-input").forEach((slider) => {
       const valueDisplayId = slider.id.replace("-slider", "-value");
       const valueDisplay = document.getElementById(valueDisplayId);
-
       const updateFunc = () => {
-        const suffix =
-          slider.id.includes("width") || slider.id.includes("height")
-            ? "px"
-            : "";
-        if (valueDisplay) {
-          valueDisplay.textContent = slider.value + suffix;
-        }
+        if (valueDisplay)
+          valueDisplay.textContent =
+            slider.value + (slider.id.includes("px") ? "px" : "");
         updateSliderBackground(slider);
       };
       slider.addEventListener("input", updateFunc);
       updateFunc();
+    });
+
+    document.querySelectorAll(".form-textarea").forEach((textarea) => {
+      textarea.addEventListener("input", () => autoResizeTextarea(textarea));
+      autoResizeTextarea(textarea);
     });
 
     ui.nav.links.forEach((link) => {
@@ -376,12 +430,10 @@ document.addEventListener("DOMContentLoaded", () => {
     ui.params.aspectRatioBtns.addEventListener("click", (e) => {
       const btn = e.target.closest(".btn-aspect-ratio");
       if (btn && !state.isBusy) {
-        const ratio = btn.dataset.ratio;
-        // This logic now works automatically for FLUX models
         const presets =
           ASPECT_RATIOS[state.modelType] || ASPECT_RATIOS["SD 1.5"];
-        if (presets[ratio]) {
-          setDimensions(...presets[ratio]);
+        if (presets[btn.dataset.ratio]) {
+          setDimensions(...presets[btn.dataset.ratio]);
           ui.params.aspectRatioBtns
             .querySelectorAll("button")
             .forEach((b) => b.classList.remove("active"));
@@ -391,42 +443,75 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     const refreshHandler = async (type) => {
-      try {
-        const response = await fetch("/api/config");
-        if (!response.ok) throw new Error("Failed to fetch config");
-        const config = await response.json();
-        if (type === "models") {
-          createCustomDropdown(ui.model.dropdown, config.models);
-        } else if (type === "loras") {
-          createCustomDropdown(ui.lora.dropdown, ["None", ...config.loras]);
-        }
-      } catch (error) {
-        console.error(`Failed to refresh ${type}:`, error);
-        alert(`Could not refresh ${type} list.`);
-      }
+      const response = await fetch("/api/config");
+      const config = await response.json();
+      if (type === "models")
+        createCustomDropdown(ui.model.dropdown, config.models);
+      else if (type === "loras")
+        createCustomDropdown(ui.lora.dropdown, ["None", ...config.loras]);
     };
 
     ui.model.refreshBtn.addEventListener("click", () =>
       refreshHandler("models")
     );
     ui.lora.refreshBtn.addEventListener("click", () => refreshHandler("loras"));
-
     ui.gallery.refreshBtn.addEventListener("click", () =>
       fetch("/api/config")
         .then((res) => res.json())
         .then((config) => populateGallery(config.gallery_images))
     );
 
-    ui.lightbox.closeBtn.addEventListener("click", () =>
-      ui.lightbox.container.classList.add("hidden")
-    );
+    ui.generate.wrapper.addEventListener("click", () => {
+      if (!ui.generate.outputImage.classList.contains("hidden"))
+        openLightbox(null);
+    });
+    ui.generate.viewBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!ui.generate.outputImage.classList.contains("hidden"))
+        openLightbox(null);
+    });
+
+    ui.lightbox.closeBtn.addEventListener("click", closeLightbox);
     ui.lightbox.container.addEventListener("click", (e) => {
-      if (e.target === ui.lightbox.container)
-        ui.lightbox.container.classList.add("hidden");
+      if (e.target === ui.lightbox.container) closeLightbox();
+    });
+    ui.lightbox.prevBtn.addEventListener("click", () =>
+      showLightboxImage(state.currentLightboxIndex - 1)
+    );
+    ui.lightbox.nextBtn.addEventListener("click", () =>
+      showLightboxImage(state.currentLightboxIndex + 1)
+    );
+    ui.lightbox.zoomInBtn.addEventListener("click", () => {
+      state.zoomLevel = Math.min(5, state.zoomLevel + 0.2);
+      updateImageTransform();
+    });
+    ui.lightbox.zoomOutBtn.addEventListener("click", () => {
+      state.zoomLevel = Math.max(0.2, state.zoomLevel - 0.2);
+      updateImageTransform();
+    });
+    ui.lightbox.fitBtn.addEventListener("click", resetZoomAndPan);
+
+    ui.lightbox.imageWrapper.addEventListener("mousedown", (e) => {
+      if (e.button !== 0 || state.zoomLevel <= 1) return;
+      state.isPanning = true;
+      state.panStart = {
+        x: e.clientX - state.panCurrent.x,
+        y: e.clientY - state.panCurrent.y,
+      };
+    });
+    window.addEventListener("mousemove", (e) => {
+      if (!state.isPanning) return;
+      state.panCurrent = {
+        x: e.clientX - state.panStart.x,
+        y: e.clientY - state.panStart.y,
+      };
+      updateImageTransform();
+    });
+    window.addEventListener("mouseup", () => {
+      state.isPanning = false;
     });
   }
 
-  // --- Initialization ---
   async function init() {
     try {
       const response = await fetch("/api/config");
@@ -437,6 +522,17 @@ document.addEventListener("DOMContentLoaded", () => {
       createCustomDropdown(ui.model.samplerDropdown, config.schedulers);
       createCustomDropdown(ui.lora.dropdown, ["None", ...config.loras]);
       populateGallery(config.gallery_images);
+      ui.busyControls = [
+        ...document.querySelectorAll("button"),
+        ...document.querySelectorAll("input"),
+        ...document.querySelectorAll("textarea"),
+        ...document.querySelectorAll(".custom-dropdown"),
+      ].filter(
+        (el) =>
+          !el.closest(
+            ".nav-links, .gallery-header, .gallery-grid, .image-actions-overlay, .lightbox"
+          )
+      );
       setBusyState(false);
     } catch (error) {
       console.error("Failed to fetch initial config:", error);
