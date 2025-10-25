@@ -86,7 +86,7 @@
                               <h2 class="card-title">Prompting</h2>
                               <div class="control-group"><label for="prompt">Prompt</label><textarea id="prompt"
                                         class="form-textarea"
-                                        placeholder="A cinematic photo of...">photo of a beautiful woman, 8k, ultra realistic, cinematic</textarea>
+                                        placeholder="A cinematic photo of...">fantasy portrait of a mystical woman with blue flowing hair resembling ocean waves, watercolor art, cool color palette, seafoam accents, luminous eyes, elegant posture, magical and calming aura, fine art style, detailed face, soft-focus lighting, painterly textures</textarea>
                               </div>
                               <div class="control-group"><label for="negative-prompt">Negative Prompt</label><textarea
                                         id="negative-prompt" class="form-textarea"
@@ -99,15 +99,15 @@
                               <h2 class="card-title">Parameters</h2>
                               <div class="control-group">
                                    <div class="flex-between"><label for="steps-slider">Steps</label><span
-                                             class="slider-value" id="steps-value">28</span></div>
+                                             class="slider-value" id="steps-value">50</span></div>
                                    <div class="slider-container"><input type="range" id="steps-slider"
-                                             class="range-input" min="1" max="100" value="28" step="1"></div>
+                                             class="range-input" min="1" max="100" value="50" step="1"></div>
                               </div>
                               <div class="control-group">
                                    <div class="flex-between"><label for="guidance-slider">Guidance (CFG)</label><span
-                                             class="slider-value" id="guidance-value">7.0</span></div>
+                                             class="slider-value" id="guidance-value">3.0</span></div>
                                    <div class="slider-container"><input type="range" id="guidance-slider"
-                                             class="range-input" min="1" max="20" value="7.0" step="0.1"></div>
+                                             class="range-input" min="1" max="20" value="3.0" step="0.1"></div>
                               </div>
                               <div class="control-group"><label for="seed-input">Seed</label>
                                    <div class="input-with-button"><input type="number" id="seed-input" value="12345"
@@ -211,6 +211,8 @@
                               class="material-symbols-outlined">zoom_in</span></button>
                     <button id="lightbox-fit" title="Fit to Screen"><span
                               class="material-symbols-outlined">fit_screen</span></button>
+                    <button id="lightbox-delete" title="Delete Image"><span
+                              class="material-symbols-outlined">delete</span></button>
                     <button id="lightbox-close" title="Close"><span
                               class="material-symbols-outlined">close</span></button>
                </div>
