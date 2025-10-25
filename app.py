@@ -3,22 +3,15 @@ import argparse
 import logging
 import sys
 import os
-import contextlib
 import signal
 import random
 import torch
-import warnings
 from helpers.cli_manager import setup_logging, log_system_info, APP_LOGGER_NAME
 from core.logic import (
     SCHEDULER_MAP,
     get_available_models,
     get_available_loras,
     get_output_images,
-)
-
-warnings.filterwarnings(
-    "ignore",
-    message="You have disabled the safety checker for <class 'diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline'>.*",
 )
 
 parser = argparse.ArgumentParser(
