@@ -191,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
       setBusyState(false);
       updateLoadButtonState();
 
-      ui.params.resText.textContent = `Est. max resolution: ${data.max_res_vram}px (VRAM), ${data.max_res_offload}px (Offload)`;
+      ui.params.resText.innerHTML = `Est. max resolution: <strong>${data.max_res_vram}px</strong> (VRAM), <strong>${data.max_res_offload}px</strong> (Offload)`;
       ui.params.resGuidance.classList.remove("hidden");
     },
     generation_complete: (data) => {
@@ -732,8 +732,12 @@ document.addEventListener("DOMContentLoaded", () => {
       setBusyState(false);
       updateLoadButtonState();
     } catch (error) {
+      showDialog(
+        "Initialization Error",
+        "Could not load configuration from the server. Please refresh the page.",
+        [{ text: "OK" }]
+      );
       console.error("Failed to fetch initial config:", error);
-      alert("Could not load configuration from the server. Please refresh.");
     }
   }
 
