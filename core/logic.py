@@ -71,6 +71,32 @@ def get_output_images():
     ]
 
 
+def delete_image(filename):
+    if not filename:
+        raise ValueError("Filename cannot be empty.")
+
+    outputs_dir = os.path.abspath("./outputs")
+    file_path = os.path.abspath(os.path.join(outputs_dir, filename))
+
+    if os.path.commonpath([file_path, outputs_dir]) != outputs_dir:
+        logger.error(
+            f"Attempted to delete file outside of outputs directory: {filename}"
+        )
+        raise PermissionError("Cannot delete files outside of the outputs directory.")
+
+    if not os.path.exists(file_path):
+        logger.warning(f"Attempted to delete non-existent file: {filename}")
+        return {"status": "not_found", "message": f"File '{filename}' not found."}
+
+    try:
+        os.remove(file_path)
+        logger.info(f"Successfully deleted image: {filename}")
+        return {"status": "success", "message": f"Deleted '{filename}'."}
+    except Exception as e:
+        logger.error(f"Error deleting file '{filename}': {e}", exc_info=True)
+        raise IOError(f"Could not delete file '{filename}'.")
+
+
 def unload_model():
     if not app_state["is_model_loaded"]:
         logger.info("Unload command received, but no model is currently loaded.")
