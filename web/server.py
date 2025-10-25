@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 from core import logic as core
+from core.logic import OOMError
 
 APP_LOGGER_NAME = "arttic_lab"
 logger = logging.getLogger(APP_LOGGER_NAME)
@@ -73,20 +74,25 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({"type": "model_loaded", "data": result})
 
                 elif action == "generate_image":
-                    result = await asyncio.to_thread(
-                        core.generate_image,
-                        **payload,
-                        progress_callback=progress_callback,
-                    )
-                    await websocket.send_json(
-                        {"type": "generation_complete", "data": result}
-                    )
-                    await manager.broadcast(
-                        {
-                            "type": "gallery_updated",
-                            "data": {"images": core.get_output_images()},
-                        }
-                    )
+                    try:
+                        result = await asyncio.to_thread(
+                            core.generate_image,
+                            **payload,
+                            progress_callback=progress_callback,
+                        )
+                        await websocket.send_json(
+                            {"type": "generation_complete", "data": result}
+                        )
+                        await manager.broadcast(
+                            {
+                                "type": "gallery_updated",
+                                "data": {"images": core.get_output_images()},
+                            }
+                        )
+                    except OOMError as e:
+                        await websocket.send_json(
+                            {"type": "generation_failed", "data": {"message": str(e)}}
+                        )
 
                 elif action == "unload_model":
                     result = await asyncio.to_thread(core.unload_model)
