@@ -1,4 +1,3 @@
-# web/server.py
 import asyncio
 import logging
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -28,6 +27,46 @@ async def read_root():
 @app.get("/api/config")
 async def get_initial_config():
     return core.get_config()
+
+
+@app.get("/api/prompts")
+async def get_prompts():
+    return core.get_prompts()
+
+
+from fastapi import Request
+import json
+
+
+@app.post("/api/prompts")
+async def add_prompt(request: Request):
+    body = await request.json()
+    title = body.get("title")
+    prompt = body.get("prompt")
+    negative_prompt = body.get("negative_prompt", "")
+    return core.add_prompt(title, prompt, negative_prompt)
+
+
+@app.put("/api/prompts")
+async def update_prompt(request: Request):
+    body = await request.json()
+    old_title = body.get("old_title")
+    new_title = body.get("new_title")
+    prompt = body.get("prompt")
+    negative_prompt = body.get("negative_prompt")
+    return core.update_prompt(old_title, new_title, prompt, negative_prompt)
+
+
+@app.delete("/api/prompts")
+async def delete_prompt(request: Request):
+    body = await request.json()
+    title = body.get("title")
+    return core.delete_prompt(title)
+
+
+@app.get("/api/image_metadata/{filename}")
+async def get_image_metadata(filename: str):
+    return core.get_image_metadata(filename)
 
 
 class ConnectionManager:
@@ -79,9 +118,19 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 elif action == "generate_image":
                     try:
+                        gen_args = {
+                            "prompt": payload.get("prompt"),
+                            "negative_prompt": payload.get("negative_prompt"),
+                            "steps": payload.get("steps"),
+                            "guidance": payload.get("guidance"),
+                            "seed": payload.get("seed"),
+                            "width": payload.get("width"),
+                            "height": payload.get("height"),
+                            "lora_weight": payload.get("lora_weight"),
+                        }
                         result = await asyncio.to_thread(
                             core.generate_image,
-                            **payload,
+                            **gen_args,
                             progress_callback=progress_callback,
                             loop=loop,
                         )
@@ -116,6 +165,55 @@ async def websocket_endpoint(websocket: WebSocket):
                         }
                     )
 
+                elif action == "get_settings_data":
+                    data = {
+                        "models": await asyncio.to_thread(core.get_model_files),
+                        "loras": await asyncio.to_thread(core.get_lora_files),
+                    }
+                    await websocket.send_json({"type": "settings_data", "data": data})
+
+                elif action == "delete_model_file":
+                    filename = payload.get("filename")
+                    result = await asyncio.to_thread(core.delete_model_file, filename)
+                    await websocket.send_json(
+                        {"type": "model_file_deleted", "data": result}
+                    )
+                    if result.get("status") == "success":
+                        updated_data = {
+                            "models": await asyncio.to_thread(core.get_model_files),
+                            "loras": await asyncio.to_thread(core.get_lora_files),
+                        }
+                        await manager.broadcast(
+                            {"type": "settings_data_updated", "data": updated_data}
+                        )
+
+                elif action == "delete_lora_file":
+                    filename = payload.get("filename")
+                    result = await asyncio.to_thread(core.delete_lora_file, filename)
+                    await websocket.send_json(
+                        {"type": "lora_file_deleted", "data": result}
+                    )
+                    if result.get("status") == "success":
+                        updated_data = {
+                            "models": await asyncio.to_thread(core.get_model_files),
+                            "loras": await asyncio.to_thread(core.get_lora_files),
+                        }
+                        await manager.broadcast(
+                            {"type": "settings_data_updated", "data": updated_data}
+                        )
+
+                elif action == "restart_backend":
+                    await websocket.send_json(
+                        {"type": "backend_restarting", "data": {}}
+                    )
+                    await asyncio.sleep(0.5)
+                    core.restart_backend()
+                    break
+
+                elif action == "clear_cache":
+                    result = await asyncio.to_thread(core.clear_cache)
+                    await websocket.send_json({"type": "cache_cleared", "data": result})
+
                 else:
                     logger.warning(f"Unknown WebSocket action received: {action}")
 
@@ -127,7 +225,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info("Client disconnected.")
-        manager.disconnect(websocket)
     except Exception as e:
         logger.error(f"An unexpected error occurred in WebSocket: {e}", exc_info=True)
-        manager.disconnect(websocket)
+    finally:
+        if websocket in manager.active_connections:
+            manager.disconnect(websocket)
