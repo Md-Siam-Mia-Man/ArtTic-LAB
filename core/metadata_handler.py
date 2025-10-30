@@ -24,7 +24,7 @@ class MetadataHandler:
             "cfg_scale": cfg_scale,
             "timestamp_generation": datetime.utcnow().isoformat() + "Z",
             "timestamp_modification": datetime.utcnow().isoformat() + "Z",  # Will be updated when modified
-            "arttic_lab_version": "2.5.0",  # Current version
+            "arttic_lab_version": "3.0.0",  # Current version
         }
         
         if lora_info:
