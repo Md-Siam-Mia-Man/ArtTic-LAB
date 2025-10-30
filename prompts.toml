@@ -1,0 +1,19 @@
+[[default_prompts]]
+title = "The Sunken Library"
+prompt = "An ancient, circular library partially submerged in calm, clear water. Moonlight streams through a grand oculus in the ceiling, illuminating floating books and glowing bioluminescent moss on stone walls. Fantasy concept art, atmospheric, mysterious, highly detailed, Unreal Engine 5 render, trending on ArtStation."
+negative_prompt = "bright daylight, dry, empty, modern, people, blurry, low quality, disfigured books."
+
+[[default_prompts]]
+title = "Cosmic Oracle"
+prompt = "Close-up portrait of an ethereal cosmic oracle. Her long, flowing hair is a swirling galaxy filled with stars. Her eyes are like twin nebulae, glowing with inner light. Ornate, celestial armor with intricate filigree. Cosmic dust shimmers on her skin. Digital painting, hyperrealistic, stunning detail, atmospheric, elegant."
+negative_prompt = "plain, simple, boring, ugly, deformed face, cartoon, 3d render, poorly drawn hands, extra fingers."
+
+[[default_prompts]]
+title = "Crystal Desert at Dusk"
+prompt = "A vast desert at dusk, dunes made of giant, smooth, translucent crystals reflecting the twilight colors. Two large moons hang in a deep purple and orange sky. Surreal landscape, fantasy environment, beautiful, peaceful, cinematic wide shot, matte painting, 8k resolution."
+negative_prompt = "sand, ocean, trees, people, buildings, harsh lighting, daytime, blurry, grainy."
+
+[[default_prompts]]
+title = "Clockwork Dragon"
+prompt = "A magnificent clockwork dragon perched atop a gothic clock tower. Its body is crafted from intricate brass, copper, and polished wood, with visible gears and cogs turning beneath its plating. Puffs of steam vent from its joints. Dramatic lighting from a stormy sky, steampunk, highly detailed, photorealistic, masterpiece."
+negative_prompt = "flesh, scales, biological, simple, cartoon, flying, modern city, plastic."
