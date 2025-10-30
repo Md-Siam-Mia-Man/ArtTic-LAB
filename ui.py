@@ -47,12 +47,12 @@ def create_ui(available_models, available_loras, schedulers_list, handlers):
 
                         prompt = gr.Textbox(
                             label="Prompt",
-                            value="photo of a beautiful woman, 8k, ultra realistic, cinematic",
+                            value="fantasy portrait of a mystical woman with blue flowing hair resembling ocean waves, watercolor art, cool color palette, seafoam accents, luminous eyes, elegant posture, magical and calming aura, fine art style, detailed face, soft-focus lighting, painterly textures",
                             lines=3,
                         )
                         negative_prompt = gr.Textbox(
                             label="Negative Prompt",
-                            placeholder="e.g., ugly, deformed, blurry (optional for FLUX Schnell/SD3)",
+                            placeholder="",
                             lines=2,
                         )
 
