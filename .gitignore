@@ -147,3 +147,6 @@ web/__pycache__/
 /outputs
 /loras
 node_modules/
+
+#Files
+package-lock.json
