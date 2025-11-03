@@ -1,122 +1,70 @@
 @echo off
 setlocal
 
-:: --- Configuration ---
-set ENV_NAME=ArtTic-LAB
-set PYTHON_VERSION=3.11
+rem --- Configuration ---
+set "ENV_NAME=ArtTic-LAB"
+set "PYTHON_VERSION=3.11"
 
-:: --- Subroutines (as goto labels) ---
-:find_conda
-    echo [INFO] Searching for Conda installation...
-    
-    :: 1. Best case: Conda is already available in the shell
-    where conda >nul 2>nul
-    if %errorlevel% equ 0 (
-        echo [SUCCESS] Conda is already in your PATH.
-        for /f "delims=" %%i in ('conda info --base') do set CONDA_BASE_PATH=%%i
-        goto :conda_found
-    )
-
-    :: 2. Search common user paths
-    if exist "%USERPROFILE%\miniconda3\condabin\conda.bat" (
-        set CONDA_BASE_PATH=%USERPROFILE%\miniconda3
-        goto :conda_found
-    )
-    if exist "%USERPROFILE%\anaconda3\condabin\conda.bat" (
-        set CONDA_BASE_PATH=%USERPROFILE%\anaconda3
-        goto :conda_found
-    )
-
-    goto :conda_not_found
-
-:conda_found
-    echo [INFO] Conda found at: %CONDA_BASE_PATH%
-    call "%CONDA_BASE_PATH%\Scripts\activate.bat" base
-    goto :eof
-
-:conda_not_found
-    echo [ERROR] Conda installation not found. Please ensure Miniconda or Anaconda is installed.
-    exit /b 1
-
-:create_environment
-    echo.
-    echo -------------------------------------------------------
-    echo [INFO] Creating Conda environment with Python %PYTHON_VERSION%...
-    echo -------------------------------------------------------
-    
-    echo [INFO] Removing any previous version of '%ENV_NAME%'...
-    call conda env remove --name "%ENV_NAME%" -y >nul 2>nul
-    
-    echo [INFO] Creating new Conda environment...
-    call conda create --name "%ENV_NAME%" python=%PYTHON_VERSION% -y
-    goto :eof
-
-:handle_hf_login
-    echo.
-    echo -------------------------------------------------------
-    echo [ACTION REQUIRED] Hugging Face Login
-    echo -------------------------------------------------------
-    echo Models like SD3 and FLUX require you to be logged into
-    echo your Hugging Face account to download base files.
-    echo.
-    
-    choice /c yn /m "Would you like to log in now? (y/n): "
-    if errorlevel 2 (
-        echo.
-        echo [INFO] Skipping Hugging Face login.
-        echo You can log in later by opening a terminal, running
-        echo 'conda activate %ENV_NAME%' and then 'huggingface-cli login'.
-        echo Note: SD3 and FLUX models will not work until you do.
-    ) else (
-        echo.
-        echo [INFO] Please get your Hugging Face User Access Token here:
-        echo        https://huggingface.co/settings/tokens
-        echo [INFO] The token needs at least 'read' permissions.
-        echo.
-        call huggingface-cli login
-        echo.
-        echo [IMPORTANT] Remember to visit the model pages on the
-        echo Hugging Face website to accept their license agreements:
-        echo - SD3: https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers
-        echo - FLUX: https://huggingface.co/black-forest-labs/FLUX.1-dev
-        echo.
-    )
-    goto :eof
-
-
-:: --- Main Script ---
+rem --- Main Script ---
 cls
 echo =======================================================
 echo             ArtTic-LAB Installer for Windows
 echo =======================================================
 echo.
 echo This script will find your Conda installation and prepare
-echo the '%ENV_NAME%' environment.
+echo the "%ENV_NAME%" environment.
 echo.
 
-:: 1. Find and initialize Conda
-call :find_conda
-if %errorlevel% neq 0 exit /b 1
+rem 1. Find Conda installation robustly
+echo [INFO] Searching for Conda installation...
+set "CONDA_BASE_PATH="
+if exist "%USERPROFILE%\miniforge3\condabin\conda.bat" set "CONDA_BASE_PATH=%USERPROFILE%\miniforge3"
+if exist "%USERPROFILE%\Miniconda3\condabin\conda.bat" set "CONDA_BASE_PATH=%USERPROFILE%\Miniconda3"
+if exist "%USERPROFILE%\anaconda3\condabin\conda.bat" set "CONDA_BASE_PATH=%USERPROFILE%\anaconda3"
+if exist "%ProgramData%\miniforge3\condabin\conda.bat" set "CONDA_BASE_PATH=%ProgramData%\miniforge3"
+if exist "%ProgramData%\Miniconda3\condabin\conda.bat" set "CONDA_BASE_PATH=%ProgramData%\Miniconda3"
+if exist "%ProgramData%\anaconda3\condabin\conda.bat" set "CONDA_BASE_PATH=%ProgramData%\anaconda3"
 
-:: 2. Handle environment creation
+if not defined CONDA_BASE_PATH (
+    echo [ERROR] Could not find Conda. Please ensure Miniconda, Anaconda, or Miniforge is installed in a standard location.
+    pause
+    exit /b 1
+)
+echo [SUCCESS] Found Conda at: %CONDA_BASE_PATH%
+set "ACTIVATE_BAT=%CONDA_BASE_PATH%\Scripts\activate.bat"
+
+rem 2. Initialize Conda for this script session
+echo [INFO] Initializing Conda for this session...
+call "%ACTIVATE_BAT%" base
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to activate Conda base environment.
+    pause
+    exit /b 1
+)
+
+rem 3. Handle environment creation
 echo.
-echo [INFO] Checking for existing '%ENV_NAME%' environment...
-call conda env list | findstr /b /c:"%ENV_NAME% " >nul
+echo [INFO] Checking for existing "%ENV_NAME%" environment...
+conda env list | findstr /B /C:"%ENV_NAME% " >nul
 if %errorlevel% equ 0 (
-    echo [WARNING] Environment '%ENV_NAME%' already exists.
-    choice /c yn /m "Do you want to remove and reinstall it? (y/n): "
+    echo [WARNING] Environment "%ENV_NAME%" already exists.
+    choice /c yn /m "Do you want to remove and reinstall it? (y/n):"
     if errorlevel 2 (
         echo [INFO] Skipping environment creation. Will update packages.
     ) else (
-        call :create_environment
+        echo [INFO] Removing previous version of "%ENV_NAME%"...
+        conda env remove --name "%ENV_NAME%" -y >nul 2>&1
+        echo [INFO] Creating new Conda environment...
+        conda create --name "%ENV_NAME%" python=%PYTHON_VERSION% -y
     )
 ) else (
-    call :create_environment
+    echo [INFO] Creating new Conda environment...
+    conda create --name "%ENV_NAME%" python=%PYTHON_VERSION% -y
 )
 
-:: 3. Activate environment and install packages
+rem 4. Activate environment and install packages
 echo.
-echo [INFO] Activating environment and installing/updating dependencies...
+echo [INFO] Activating environment and installing dependencies...
 echo This is the longest step. Please be patient.
 call conda activate "%ENV_NAME%"
 
@@ -147,7 +95,7 @@ if %hardware_choice%==3 (
 echo [INFO] Installing other dependencies from requirements.txt...
 pip install -r requirements.txt
 
-:: 4. Install Web UI dependencies
+rem 5. Install Web UI dependencies
 echo.
 echo [INFO] Installing Web UI dependencies...
 where npm >nul 2>nul
@@ -156,13 +104,40 @@ if %errorlevel% neq 0 (
     echo Skipping automatic installation of UI icon packages.
     echo The UI will still work but will fetch icons from the web.
 ) else (
-    cd web
+    pushd web
     call npm install
-    cd ..
+    popd
 )
 
-:: 5. Handle Hugging Face Login
-call :handle_hf_login
+rem 6. Handle Hugging Face Login
+echo.
+echo -------------------------------------------------------
+echo [ACTION REQUIRED] Hugging Face Login
+echo -------------------------------------------------------
+echo Models like SD3 and FLUX require you to be logged into
+echo your Hugging Face account to download base files.
+echo.
+set /p login_choice="Would you like to log in now? (y/n): "
+if /i "%login_choice%"=="y" (
+    echo.
+    echo [INFO] Please get your Hugging Face User Access Token here:
+    echo        https://huggingface.co/settings/tokens
+    echo [INFO] The token needs at least 'read' permissions.
+    echo.
+    huggingface-cli login
+    echo.
+    echo [IMPORTANT] Remember to visit the model pages on the
+    echo Hugging Face website to accept their license agreements:
+    echo - SD3: https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers
+    echo - FLUX: https://huggingface.co/black-forest-labs/FLUX.1-dev
+    echo.
+) else (
+    echo.
+    echo [INFO] Skipping Hugging Face login.
+    echo You can log in later by opening a terminal, running
+    echo 'conda activate %ENV_NAME%' and then 'huggingface-cli login'.
+    echo Note: SD3 and FLUX models will not work until you do.
+)
 
 echo.
 echo =======================================================

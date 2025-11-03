@@ -4,13 +4,6 @@
 # --- Configuration ---
 ENV_NAME="ArtTic-LAB"
 
-# --- Colors ---
-CYAN='\033[0;36m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
 # --- Subroutine to find Conda installation ---
 find_conda() {
     if command -v conda &> /dev/null; then
@@ -31,41 +24,41 @@ find_conda() {
 }
 
 # --- Main Script ---
-echo -e "${CYAN}[INFO] Preparing to launch ArtTic-LAB...${NC}"
+echo "[INFO] Preparing to launch ArtTic-LAB..."
 
 # 1. Find and Initialize Conda
 if ! find_conda; then
-    echo -e "${RED}[ERROR] Conda installation not found.${NC}" >&2
+    echo "[ERROR] Conda installation not found." >&2
     echo "Please ensure Miniconda, Anaconda, or Miniforge is installed and run install.sh." >&2
     exit 1
 fi
-echo -e "${CYAN}[INFO] Conda found at: ${YELLOW}${CONDA_BASE_PATH}${NC}"
+echo "[INFO] Conda found at: ${CONDA_BASE_PATH}"
 
 source "${CONDA_BASE_PATH}/etc/profile.d/conda.sh"
 if [ $? -ne 0 ]; then
-    echo -e "${RED}[ERROR] Failed to initialize the Conda command environment.${NC}" >&2
+    echo "[ERROR] Failed to initialize the Conda command environment." >&2
     echo "Your Conda installation might be corrupted." >&2
     exit 1
 fi
 
 # 2. Verify and Activate Environment
-echo -e "${CYAN}[INFO] Checking for '${ENV_NAME}' environment...${NC}"
+echo "[INFO] Checking for '${ENV_NAME}' environment..."
 if ! conda env list | grep -q "^${ENV_NAME} "; then
-    echo -e "${RED}[ERROR] The '${ENV_NAME}' environment was not found.${NC}" >&2
+    echo "[ERROR] The '${ENV_NAME}' environment was not found." >&2
     echo "Please run './install.sh' first to set it up." >&2
     exit 1
 fi
 
-echo -e "${CYAN}[INFO] Activating environment...${NC}"
+echo "[INFO] Activating environment..."
 conda activate "${ENV_NAME}"
 if [ $? -ne 0 ]; then
-    echo -e "${RED}[ERROR] Failed to activate the '${ENV_NAME}' environment.${NC}" >&2
+    echo "[ERROR] Failed to activate the '${ENV_NAME}' environment." >&2
     echo "Please try running './install.sh' again." >&2
     exit 1
 fi
 
 # 3. Launch the Application
-echo -e "${GREEN}[SUCCESS] Environment activated. Launching application...${NC}"
+echo "[SUCCESS] Environment activated. Launching application..."
 echo
 echo "======================================================="
 echo "             Launching ArtTic-LAB"
