@@ -70,11 +70,22 @@ We’ve packed ArtTic-LAB with features designed to maximize performance and str
 
 ## 📸 Creations Gallery
 
-|                               |                               |                                 |
-| :---------------------------: | :---------------------------: | :-----------------------------: |
-| ![Demo 1](assets/demos/1.png) | ![Demo 2](assets/demos/2.png) |  ![Demo 3](assets/demos/3.png)  |
-| ![Demo 4](assets/demos/4.png) | ![Demo 5](assets/demos/5.png) |  ![Demo 6](assets/demos/6.png)  |
-| ![Demo 7](assets/demos/7.png) | ![Demo 9](assets/demos/9.png) | ![Demo 10](assets/demos/10.png) |
+<p align="center">
+  <em>Explore a glimpse of what ArtTic-LAB can create — all demo images are 512×512 px.</em>
+</p>
+
+<div align="center" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
+  <img src="assets/demos/1.png" alt="Demo 1" width="256" style="border-radius: 10px; object-fit: cover;"/>
+  <img src="assets/demos/2.png" alt="Demo 2" width="256" style="border-radius: 10px; object-fit: cover;"/>
+  <img src="assets/demos/3.png" alt="Demo 3" width="256" style="border-radius: 10px; object-fit: cover;"/>
+  <img src="assets/demos/4.png" alt="Demo 4" width="256" style="border-radius: 10px; object-fit: cover;"/>
+  <img src="assets/demos/5.png" alt="Demo 5" width="256" style="border-radius: 10px; object-fit: cover;"/>
+  <img src="assets/demos/6.png" alt="Demo 6" width="256" style="border-radius: 10px; object-fit: cover;"/>
+  <img src="assets/demos/7.png" alt="Demo 7" width="256" style="border-radius: 10px; object-fit: cover;"/>
+  <img src="assets/demos/9.png" alt="Demo 9" width="256" style="border-radius: 10px; object-fit: cover;"/>
+  <img src="assets/demos/10.png" alt="Demo 10" width="256" style="border-radius: 10px; object-fit: cover;"/>
+</div>
+
 
 ---
 
