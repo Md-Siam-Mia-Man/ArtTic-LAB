@@ -5,19 +5,15 @@
      <meta charset="utf-8" />
      <meta content="width=device-width, initial-scale=1.0" name="viewport" />
      <title>ArtTic-LAB</title>
-     <link rel="icon" href="/static/asset/logo.svg" type="image/svg+xml">
-     <link href="https://fonts.googleapis.com" rel="preconnect" />
-     <link crossorigin href="https://fonts.gstatic.com" rel="preconnect" />
-     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap"
-          rel="stylesheet">
-     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+     <link rel="icon" href="/static/asset/logo.png" type="image/svg+xml">
+     <link href="/npm/material-symbols/outlined.css" rel="stylesheet" />
      <link href="/static/css/style.css" rel="stylesheet" />
 </head>
 
 <body>
      <header class="top-bar">
           <div class="logo-brand">
-               <img src="/static/asset/logo.svg" alt="ArtTic-LAB Logo" class="app-logo-icon" />
+               <img src="/static/asset/logo.png" alt="ArtTic-LAB Logo" class="app-logo-icon" />
                <h1 class="app-title">ArtTic-LAB</h1>
           </div>
           <nav class="nav-links">
@@ -46,6 +42,8 @@
           </div>
      </header>
 
+     <div id="notification-container"></div>
+
      <main class="main-content">
           <div id="page-generate" class="page-content">
                <svg id="node-connector-svg" class="node-connector-svg"></svg>
@@ -53,8 +51,8 @@
           </div>
 
           <div id="page-gallery" class="page-content hidden">
-               <div class="gallery-header">
-                    <h1 class="gallery-title">Your Generations</h1>
+               <div class="page-header">
+                    <h1 class="page-title">Your Generations</h1>
                     <button id="refresh-gallery-btn" class="btn btn-secondary"><span
                               class="material-symbols-outlined">refresh</span> Refresh</button>
                </div>
@@ -66,16 +64,16 @@
           </div>
 
           <div id="page-prompt-book" class="page-content hidden">
-               <div class="gallery-header">
-                    <h1 class="gallery-title">Prompt Book</h1>
+               <div class="page-header">
+                    <h1 class="page-title">Prompt Book</h1>
                     <div>
                          <button id="add-prompt-btn" class="btn btn-primary"><span
-                                   class="material-symbols-outlined">add</span> New</button>
+                                   class="material-symbols-outlined">add</span> New Prompt</button>
                          <button id="refresh-prompts-btn" class="btn btn-secondary"><span
                                    class="material-symbols-outlined">refresh</span></button>
                     </div>
                </div>
-               <div id="prompt-book-grid" class="gallery-grid"></div>
+               <div id="prompt-book-grid" class="prompt-book-grid"></div>
                <div id="prompt-book-placeholder" class="gallery-placeholder hidden">
                     <span class="material-symbols-outlined">stylebook</span>
                     <p>Your saved prompts will appear here.</p>
@@ -83,6 +81,9 @@
           </div>
 
           <div id="page-settings" class="page-content hidden">
+               <div class="page-header">
+                    <h1 class="page-title">File Management</h1>
+               </div>
                <div class="settings-container">
                     <div class="settings-column">
                          <div class="settings-header">

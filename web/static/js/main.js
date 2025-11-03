@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
     galleryImages: [],
     prompts: [],
     settings: { models: [], loras: [] },
+    notifications: {},
     currentLightboxIndex: -1,
     zoomLevel: 1,
     isPanning: false,
@@ -26,11 +27,13 @@ document.addEventListener("DOMContentLoaded", () => {
       scheduler_name: "Euler A",
       lora_name: null,
       lora_weight: 0.7,
-      prompt: "fantasy portrait of a mystical woman with blue flowing hair resembling ocean waves, watercolor art, cool color palette, seafoam accents, luminous eyes, elegant posture, magical and calming aura, fine art style, detailed face, soft-focus lighting, painterly textures",
-      negative_prompt: "",
+      prompt:
+        "fantasy portrait of an Ocean Spirit, mystical woman with flowing hair like seafoam green and celadon waves, watercolor art, cool color palette of mint green and dark brunswick green, luminous eyes, elegant posture, magical and calming aura, fine art style, detailed face, soft-focus lighting, painterly textures",
+      negative_prompt:
+        "ugly, deformed, blurry, noisy, saturated colors, warm colors",
       steps: 50,
-      guidance: 3,
-      seed: 12345,
+      guidance: 5,
+      seed: -1,
       width: 512,
       height: 512,
       vae_tiling: true,
@@ -96,6 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
       message: document.getElementById("dialog-message"),
       buttons: document.getElementById("dialog-buttons"),
     },
+    notificationContainer: document.getElementById("notification-container"),
     themeToggle: document.getElementById("theme-toggle-btn"),
     node: {
       canvas: document.getElementById("node-canvas"),
@@ -110,13 +114,42 @@ document.addEventListener("DOMContentLoaded", () => {
     resetZoomBtn: document.getElementById("reset-zoom-btn"),
   };
 
+  function initTheme() {
+    const savedTheme = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", savedTheme);
+    ui.themeToggle.querySelector(".material-symbols-outlined").textContent =
+      savedTheme === "dark" ? "light_mode" : "dark_mode";
+  }
+
+  function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute("data-theme");
+    const newTheme = currentTheme === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("theme", newTheme);
+    ui.themeToggle.querySelector(".material-symbols-outlined").textContent =
+      newTheme === "dark" ? "light_mode" : "dark_mode";
+  }
+
   function connectWebSocket() {
     const url = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${
       window.location.host
     }/ws`;
     state.socket = new WebSocket(url);
-    state.socket.onopen = () =>
+    state.socket.onopen = () => {
       updateConnectionStatus("Connected", "connected");
+      fetch("/api/status")
+        .then((r) => r.json())
+        .then((status) => {
+          state.isModelLoaded = status.is_model_loaded;
+          updateLoadUnloadButton();
+          if (state.isModelLoaded) {
+            updateNodeUI("model_sampler", {
+              status: status.status_message,
+              loaded: true,
+            });
+          }
+        });
+    };
     state.socket.onclose = () => {
       updateConnectionStatus("Reconnecting...", "connecting");
       setTimeout(connectWebSocket, 3000);
@@ -139,10 +172,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function handleWebSocketMessage(type, data) {
+    const progressId = "progress_notification";
     const handlers = {
       model_loaded: (data) => {
         state.isModelLoaded = true;
         state.maxVramRes = data.max_res_vram;
+        updateLoadUnloadButton();
+        showNotification("Model loaded successfully", "success", 3000);
         updateNodeUI("model_sampler", {
           status: data.status_message,
           loaded: true,
@@ -154,62 +190,85 @@ document.addEventListener("DOMContentLoaded", () => {
           height: data.height,
           max_res: data.max_res_vram,
         });
+        clearNotification(progressId);
       },
       generation_complete: (data) => {
         state.lastGeneratedImage = data.image_filename;
         updateNodeUI("image_preview", {
           image: data.image_filename,
-          clearProgress: true,
+          info: data.info,
         });
+        showNotification("Image generated!", "success", 3000);
+        clearNotification(progressId);
       },
       generation_failed: (data) => {
-        showDialog("Generation Failed", data.message, [{ text: "OK" }]);
-        updateNodeUI("image_preview", { clearProgress: true });
+        showNotification(data.message, "error", 5000);
+        clearNotification(progressId);
       },
       progress_update: (data) => {
-        updateNodeUI("image_preview", {
-          progress: data.progress,
-          description: data.description,
-        });
+        showNotification(
+          data.description,
+          "progress",
+          null,
+          progressId,
+          data.progress
+        );
       },
       model_unloaded: (data) => {
         state.isModelLoaded = false;
         state.maxVramRes = null;
+        updateLoadUnloadButton();
+        showNotification("Model unloaded", "info", 3000);
         updateNodeUI("model_sampler", {
           status: data.status_message,
           loaded: false,
         });
         updateNodeUI("parameters", { max_res: null });
       },
-      gallery_updated: (data) =>
-        populateGallery(data.images.map((img) => img.filename)),
+      gallery_updated: (data) => populateGallery(data.images),
       image_deleted: (data) => {
-        if (data.status === "success") closeLightbox();
-        else
-          showDialog("Error", `Could not delete image: ${data.message}`, [
-            { text: "OK" },
-          ]);
+        if (data.status === "success") {
+          closeLightbox();
+          showNotification("Image deleted", "success", 2000);
+        } else {
+          showNotification(
+            `Could not delete image: ${data.message}`,
+            "error",
+            4000
+          );
+        }
       },
       settings_data: (data) => {
         state.settings.models = data.models;
         state.settings.loras = data.loras;
         populateSettingsLists();
+        updateNodeUI("model_sampler", {
+          models: state.settings.models,
+        });
+        if (state.nodes.has("lora")) {
+          updateNodeUI("lora", { loras: ["None", ...state.settings.loras] });
+        }
       },
       settings_data_updated: (data) => {
         state.settings.models = data.models;
         state.settings.loras = data.loras;
         populateSettingsLists();
+        updateNodeUI("model_sampler", {
+          models: state.settings.models,
+        });
+        if (state.nodes.has("lora")) {
+          updateNodeUI("lora", { loras: ["None", ...state.settings.loras] });
+        }
+        showNotification("File lists updated", "info", 2000);
       },
-      error: (data) =>
-        showDialog("Server Error", data.message, [{ text: "OK" }]),
+      error: (data) => {
+        showNotification(data.message, "error", 5000);
+        clearNotification(progressId);
+      },
       backend_restarting: () =>
-        showDialog(
-          "Info",
-          "Backend is restarting. The page will reload shortly.",
-          []
-        ),
+        showNotification("Backend is restarting...", "info"),
       cache_cleared: () =>
-        showDialog("Success", "VRAM cache has been cleared.", [{ text: "OK" }]),
+        showNotification("VRAM cache has been cleared.", "success", 3000),
     };
     (handlers[type] || (() => console.warn(`Unhandled message type: ${type}`)))(
       data
@@ -221,20 +280,82 @@ document.addEventListener("DOMContentLoaded", () => {
     ui.status.indicator.className = `status-indicator ${statusClass}`;
   }
 
-  function initTheme() {
-    const savedTheme = localStorage.getItem("theme") || "light";
-    document.documentElement.setAttribute("data-theme", savedTheme);
-    ui.themeToggle.querySelector(".material-symbols-outlined").textContent =
-      savedTheme === "dark" ? "light_mode" : "dark_mode";
+  function showNotification(
+    message,
+    type = "info",
+    duration = 3000,
+    id = null,
+    progress = null
+  ) {
+    id = id || `noti_${Date.now()}`;
+    let notification = state.notifications[id];
+
+    const iconMap = {
+      success: "check_circle",
+      error: "error",
+      info: "info",
+      progress: "hourglass_top",
+    };
+
+    if (!notification) {
+      notification = document.createElement("div");
+      notification.className = `notification ${type}`;
+      notification.innerHTML = `<span class="material-symbols-outlined">${
+        iconMap[type] || "info"
+      }</span><div class="notification-content">${message}</div>`;
+      if (type === "progress") {
+        const progressBar = document.createElement("div");
+        progressBar.style.cssText =
+          "position:absolute;bottom:0;left:0;right:0;height:4px;background-color:rgba(0,0,0,0.1);border-radius:0 0 12px 12px;overflow:hidden;";
+        progressBar.innerHTML = `<div class="progress-bar-inner" style="height:100%;width:0%;background-color:var(--primary-500);transition:width 0.1s linear;"></div>`;
+        notification.appendChild(progressBar);
+      }
+      ui.notificationContainer.appendChild(notification);
+      state.notifications[id] = notification;
+    }
+
+    notification.querySelector(".notification-content").innerHTML = message;
+    if (type === "progress" && progress !== null) {
+      notification.querySelector(".progress-bar-inner").style.width = `${
+        progress * 100
+      }%`;
+    }
+
+    if (state.notifications[id].timeout) {
+      clearTimeout(state.notifications[id].timeout);
+    }
+
+    if (duration) {
+      state.notifications[id].timeout = setTimeout(
+        () => clearNotification(id),
+        duration
+      );
+    }
   }
 
-  function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute("data-theme");
-    const newTheme = currentTheme === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", newTheme);
-    localStorage.setItem("theme", newTheme);
-    ui.themeToggle.querySelector(".material-symbols-outlined").textContent =
-      newTheme === "dark" ? "light_mode" : "dark_mode";
+  function clearNotification(id) {
+    const notification = state.notifications[id];
+    if (notification) {
+      if (notification.timeout) clearTimeout(notification.timeout);
+      notification.remove();
+      delete state.notifications[id];
+    }
+  }
+
+  function updateLoadUnloadButton() {
+    const btn = ui.node.loadModelBtn;
+    const generateBtn = ui.node.generateBtn;
+    if (state.isModelLoaded) {
+      btn.innerHTML = `<span class="material-symbols-outlined">cancel</span> Unload Model`;
+      btn.classList.remove("btn-primary");
+      btn.classList.add("btn-danger");
+      generateBtn.disabled = false;
+    } else {
+      btn.innerHTML = `<span class="material-symbols-outlined">download</span> Load Model`;
+      btn.classList.add("btn-primary");
+      btn.classList.remove("btn-danger");
+      generateBtn.disabled = true;
+    }
   }
 
   function showDialog(title, message, buttons) {
@@ -258,13 +379,13 @@ document.addEventListener("DOMContentLoaded", () => {
     state.galleryImages = images || [];
     ui.gallery.grid.innerHTML = "";
     const hasImages = state.galleryImages.length > 0;
-    ui.gallery.placeholder.classList.toggle("hidden", hasImages);
+    ui.gallery.placeholder.classList.toggle("hidden", !hasImages);
     if (hasImages) {
-      state.galleryImages.forEach((imageFile, index) => {
+      state.galleryImages.forEach((imageInfo, index) => {
         const item = document.createElement("div");
         item.className = "gallery-item";
-        const imageUrl = `/outputs/${imageFile}`;
-        item.innerHTML = `<img src="${imageUrl}" alt="${imageFile}" class="gallery-item-image" loading="lazy"><div class="image-actions-overlay"><a href="${imageUrl}" target="_blank" class="image-action-btn" title="Open in New Tab"><span class="material-symbols-outlined">open_in_new</span></a></div>`;
+        const imageUrl = `/outputs/${imageInfo.filename}`;
+        item.innerHTML = `<img src="${imageUrl}" alt="${imageInfo.filename}" class="gallery-item-image" loading="lazy"><div class="image-actions-overlay"><a href="${imageUrl}" target="_blank" class="image-action-btn" title="Open in New Tab"><span class="material-symbols-outlined">open_in_new</span></a></div>`;
         item
           .querySelector(".image-actions-overlay")
           .addEventListener("click", (e) => e.stopPropagation());
@@ -288,7 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function showLightboxImage(index) {
     if (index < 0 || index >= state.galleryImages.length) return;
     state.currentLightboxIndex = index;
-    const filename = state.galleryImages[index];
+    const filename = state.galleryImages[index].filename;
     ui.lightbox.img.src = `/outputs/${filename}`;
     ui.lightbox.caption.textContent = filename;
     resetZoomAndPan();
@@ -310,11 +431,14 @@ document.addEventListener("DOMContentLoaded", () => {
       ArrowLeft: () => ui.lightbox.prevBtn.click(),
       ArrowRight: () => ui.lightbox.nextBtn.click(),
       "+": () => ui.lightbox.zoomInBtn.click(),
+      "=": () => ui.lightbox.zoomInBtn.click(),
       "-": () => ui.lightbox.zoomOutBtn.click(),
       f: () => ui.lightbox.fitBtn.click(),
       Delete: () => ui.lightbox.deleteBtn.click(),
     };
-    keyMap[e.key]?.();
+    if (document.activeElement.tagName !== "INPUT") {
+      keyMap[e.key]?.();
+    }
   }
 
   function populateSettingsLists() {
@@ -354,23 +478,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function initCanvasInteraction() {
     const { canvas } = ui.node;
-    const resetView = () => {
-      state.canvas.scale = 1;
-      state.canvas.offsetX = 0;
-      state.canvas.offsetY = 0;
-      updateCanvasTransform();
-    };
-    ui.resetZoomBtn.addEventListener("click", resetView);
+    ui.resetZoomBtn.addEventListener("click", centerView);
 
     canvas.addEventListener("wheel", (e) => {
       e.preventDefault();
       const rect = canvas.getBoundingClientRect();
       const wheel = e.deltaY < 0 ? 1.1 : 0.9;
-      const newScale = Math.max(0.2, Math.min(3, state.canvas.scale * wheel));
+      const newScale = Math.max(0.1, Math.min(2, state.canvas.scale * wheel));
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      state.canvas.offsetX = mouseX - (mouseX - state.canvas.offsetX) * wheel;
-      state.canvas.offsetY = mouseY - (mouseY - state.canvas.offsetY) * wheel;
+      state.canvas.offsetX =
+        mouseX -
+        (mouseX - state.canvas.offsetX) * (newScale / state.canvas.scale);
+      state.canvas.offsetY =
+        mouseY -
+        (mouseY - state.canvas.offsetY) * (newScale / state.canvas.scale);
       state.canvas.scale = newScale;
       updateCanvasTransform();
     });
@@ -396,9 +518,37 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateCanvasTransform() {
-    const { canvas, connectorSvg } = ui.node;
+    const { canvas } = ui.node;
     canvas.style.transform = `translate(${state.canvas.offsetX}px, ${state.canvas.offsetY}px) scale(${state.canvas.scale})`;
-    connectorSvg.style.transform = `translate(${state.canvas.offsetX}px, ${state.canvas.offsetY}px) scale(${state.canvas.scale})`;
+  }
+
+  function centerView() {
+    if (state.nodes.size === 0) return;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    state.nodes.forEach(({ el }) => {
+      minX = Math.min(minX, el.offsetLeft);
+      minY = Math.min(minY, el.offsetTop);
+      maxX = Math.max(maxX, el.offsetLeft + el.offsetWidth);
+      maxY = Math.max(maxY, el.offsetTop + el.offsetHeight);
+    });
+
+    const nodesWidth = maxX - minX;
+    const nodesHeight = maxY - minY;
+    const canvasRect = ui.node.canvas.parentElement.getBoundingClientRect();
+
+    const scaleX = canvasRect.width / (nodesWidth + 200);
+    const scaleY = canvasRect.height / (nodesHeight + 200);
+    state.canvas.scale = Math.min(1, scaleX, scaleY);
+
+    const centerX = minX + nodesWidth / 2;
+    const centerY = minY + nodesHeight / 2;
+    state.canvas.offsetX = canvasRect.width / 2 - centerX * state.canvas.scale;
+    state.canvas.offsetY = canvasRect.height / 2 - centerY * state.canvas.scale;
+
+    updateCanvasTransform();
   }
 
   function makeNodeDraggable(node) {
@@ -424,10 +574,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function createNode(type, x, y) {
-    if (state.nodes.has(type) && ["lora"].includes(type)) {
-      showDialog("Info", "A LoRA node already exists on the canvas.", [
-        { text: "OK" },
-      ]);
+    if (state.nodes.has(type)) {
+      showNotification("A node of this type already exists.", "info", 2000);
       return;
     }
     const nodeEl = document.createElement("div");
@@ -446,49 +594,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     switch (type) {
       case "model_sampler":
-        header = `<h3 class="node-title">Model & Sampler</h3><div class="node-header-actions"><button class="icon-btn" id="node-refresh-models" title="Refresh Models"><span class="material-symbols-outlined">refresh</span></button><button class="icon-btn" id="node-unload-model" title="Unload Model" disabled><span class="material-symbols-outlined">cancel</span></button></div>`;
-        content = `<div class="node-content">
-                <div class="control-group"><label>Model</label><div class="custom-dropdown" data-key="model_name"></div></div>
-                <div class="control-group"><label>Sampler</label><div class="custom-dropdown" data-key="scheduler_name"></div></div>
-                <div class="control-group"><div id="model-status" style="font-size: 0.8rem; text-align: center;">No model loaded.</div></div>
-            </div>`;
+        header = `<h3 class="node-title">Model & Sampler</h3>`;
+        content = `<div class="node-content"><div class="control-group"><label>Model</label><div class="custom-dropdown" data-key="model_name"><div class="dropdown-selected">Select a model</div></div></div><div class="control-group"><label>Sampler</label><div class="custom-dropdown" data-key="scheduler_name"><div class="dropdown-selected">Euler A</div></div></div><div id="model-status" class="max-res-info">No model loaded.</div></div>`;
         break;
       case "parameters":
         header = `<h3 class="node-title">Parameters & Dimensions</h3>`;
-        content = `<div class="node-content">
-                <div class="control-group"><label>Steps</label><div class="slider-input-group"><input type="range" class="range-input" data-key="steps" min="1" max="100" value="${state.generationState.steps}" step="1"><input type="number" data-value-for="steps" value="${state.generationState.steps}"></div></div>
-                <div class="control-group"><label>Guidance</label><div class="slider-input-group"><input type="range" class="range-input" data-key="guidance" min="1" max="20" value="${state.generationState.guidance}" step="1"><input type="number" data-value-for="guidance" value="${state.generationState.guidance}"></div></div>
-                <div class="control-group"><label>Width</label><div class="slider-input-group"><input type="range" class="range-input" data-key="width" min="256" max="2048" value="${state.generationState.width}" step="64"><input type="number" data-value-for="width" value="${state.generationState.width}"></div></div>
-                <div class="control-group"><label>Height</label><div class="slider-input-group"><input type="range" class="range-input" data-key="height" min="256" max="2048" value="${state.generationState.height}" step="64"><input type="number" data-value-for="height" value="${state.generationState.height}"></div></div>
-                <div class="control-group"><label>Aspect Ratio</label><div class="aspect-ratio-buttons"><button class="aspect-ratio-btn ar-1-1" data-ratio="1:1" title="1:1"></button><button class="aspect-ratio-btn ar-4-3" data-ratio="4:3" title="4:3"></button><button class="aspect-ratio-btn ar-3-4" data-ratio="3:4" title="3:4"></button><button class="aspect-ratio-btn ar-16-9" data-ratio="16:9" title="16:9"></button><button class="aspect-ratio-btn ar-9-16" data-ratio="9:16" title="9:16"></button></div></div>
-                <div class="control-group"><label>Seed</label><div class="seed-input-wrapper"><input type="number" class="form-input" data-key="seed" value="${state.generationState.seed}"><button id="random-seed" class="icon-btn" title="Randomize Seed"><span class="material-symbols-outlined">casino</span></button></div></div>
-                <div id="max-res-info" class="max-res-info"></div>
-            </div>`;
+        content = `<div class="node-content"><div class="control-group"><label>Steps</label><div class="slider-input-group"><input type="range" class="range-input" data-key="steps" min="1" max="100" value="${state.generationState.steps}" step="1"><input type="number" data-value-for="steps" value="${state.generationState.steps}"></div></div><div class="control-group"><label>Guidance</label><div class="slider-input-group"><input type="range" class="range-input" data-key="guidance" min="1" max="20" value="${state.generationState.guidance}" step="1"><input type="number" data-value-for="guidance" value="${state.generationState.guidance}" step="1"></div></div><div class="control-group"><label>Width</label><div class="slider-input-group"><input type="range" class="range-input" data-key="width" min="256" max="4096" value="${state.generationState.width}" step="64"><input type="number" data-value-for="width" value="${state.generationState.width}"></div></div><div class="control-group"><label>Height</label><div class="slider-input-group"><input type="range" class="range-input" data-key="height" min="256" max="4096" value="${state.generationState.height}" step="64"><input type="number" data-value-for="height" value="${state.generationState.height}"></div></div><div class="control-group"><div class="aspect-ratio-buttons"><button class="aspect-ratio-btn active" data-ratio="1:1" title="Square"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg></button><button class="aspect-ratio-btn" data-ratio="4:3" title="Landscape"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg></button><button class="aspect-ratio-btn" data-ratio="3:4" title="Portrait"><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"></rect></svg></button></div></div><div class="control-group"><label>Seed</label><div class="seed-input-wrapper"><input type="number" class="form-input" data-key="seed" value="${state.generationState.seed}"><button id="random-seed" class="icon-btn" title="Randomize Seed"><span class="material-symbols-outlined">casino</span></button></div></div><div id="max-res-info" class="max-res-info">Load a model for VRAM estimate.</div></div>`;
         break;
       case "image_preview":
         header = `<h3 class="node-title">Image Preview</h3>`;
-        content = `<div class="node-content">
-                <div class="image-preview-node">
-                    <div class="placeholder"><span class="material-symbols-outlined">wallpaper</span></div>
-                    <img class="preview-img hidden" />
-                    <div class="progress-overlay"><div class="progress-bar"><div class="progress-bar-inner"></div></div><span class="progress-text"></span></div>
-                </div>
-                <div class="image-preview-actions"><button id="view-image-btn" class="icon-btn" title="View Image" disabled><span class="material-symbols-outlined">visibility</span></button><button id="delete-image-btn" class="icon-btn" title="Delete Image" disabled><span class="material-symbols-outlined">delete</span></button></div>
-            </div>`;
+        content = `<div class="node-content"><div class="image-preview-node"><div class="placeholder"><span class="material-symbols-outlined">wallpaper</span></div><img class="preview-img hidden" /></div><div id="image-info-text" class="max-res-info"></div><div class="image-preview-actions"><button id="view-image-btn" class="icon-btn" title="View Image" disabled><span class="material-symbols-outlined">visibility</span></button></div></div>`;
         break;
       case "prompt":
         header = `<h3 class="node-title">Prompt</h3>`;
-        content = `<div class="node-content">
-                <div class="control-group"><label>Prompt</label><div class="autoresize-textarea-wrapper"><textarea class="form-textarea" data-key="prompt" rows="1">${state.generationState.prompt}</textarea></div></div>
-                <div class="control-group"><label>Negative Prompt</label><div class="autoresize-textarea-wrapper"><textarea class="form-textarea" data-key="negative_prompt" rows="1">${state.generationState.negative_prompt}</textarea></div></div>
-            </div>`;
+        content = `<div class="node-content"><div class="control-group"><label>Positive Prompt</label><div class="autoresize-textarea-wrapper"><textarea class="form-textarea" data-key="prompt" rows="3">${state.generationState.prompt}</textarea></div></div><div class="control-group"><label>Negative Prompt</label><div class="autoresize-textarea-wrapper"><textarea class="form-textarea" data-key="negative_prompt" rows="2">${state.generationState.negative_prompt}</textarea></div></div></div>`;
         break;
       case "lora":
         header = `<h3 class="node-title">LoRA</h3>`;
-        content = `<div class="node-content">
-                <div class="control-group"><label>LoRA</label><div class="custom-dropdown" data-key="lora_name"></div></div>
-                <div class="control-group"><label>Weight</label><div class="slider-input-group"><input type="range" class="range-input" data-key="lora_weight" min="0" max="1" value="${state.generationState.lora_weight}" step="0.05"><input type="number" data-value-for="lora_weight" value="${state.generationState.lora_weight}" step="0.05"></div></div>
-            </div>`;
+        content = `<div class="node-content"><div class="control-group"><label>LoRA</label><div class="custom-dropdown" data-key="lora_name"><div class="dropdown-selected">None</div></div></div><div class="control-group"><label>Weight</label><div class="slider-input-group"><input type="range" class="range-input" data-key="lora_weight" min="0" max="1" value="${state.generationState.lora_weight}" step="0.05"><input type="number" data-value-for="lora_weight" value="${state.generationState.lora_weight}" step="0.05"></div></div></div>`;
         break;
       default:
         return;
@@ -496,239 +619,109 @@ document.addEventListener("DOMContentLoaded", () => {
 
     nodeEl.innerHTML = `<div class="node-header">${header}${
       !isPermanent
-        ? '<button class="node-delete" title="Delete Node">&times;</button>'
+        ? '<button class="node-delete icon-btn" title="Delete Node"><span class="material-symbols-outlined">close</span></button>'
         : ""
     }</div>${content}`;
     ui.node.canvas.appendChild(nodeEl);
     state.nodes.set(type, { el: nodeEl });
     makeNodeDraggable(nodeEl);
-    initNodeControls(nodeEl, type, isPermanent);
+    initNodeControls(nodeEl, type);
   }
 
-  function initNodeControls(node, type, isPermanent) {
-    const setupAutoresize = (textarea) => {
-      const update = () => {
+  function createCustomDropdown(container, options, key) {
+    const selected = container.querySelector(".dropdown-selected");
+    let optionsList = container.querySelector(".dropdown-options");
+    if (!optionsList) {
+      optionsList = document.createElement("ul");
+      optionsList.className = "dropdown-options";
+      container.appendChild(optionsList);
+    }
+    optionsList.innerHTML = "";
+
+    options.forEach((option) => {
+      const li = document.createElement("li");
+      li.className = "dropdown-option";
+      li.textContent = option;
+      li.dataset.value = option;
+      li.addEventListener("click", () => {
+        selected.textContent = option;
+        state.generationState[key] = option;
+        container.classList.remove("open");
+      });
+      optionsList.appendChild(li);
+    });
+
+    selected.addEventListener("click", () =>
+      container.classList.toggle("open")
+    );
+  }
+
+  function initNodeControls(node, type) {
+    const sliders = node.querySelectorAll('input[type="range"]');
+    sliders.forEach((slider) => {
+      const key = slider.dataset.key;
+      const valueInput = node.querySelector(`input[data-value-for="${key}"]`);
+      const updateSliderBg = () => {
+        const percent =
+          ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+        slider.style.backgroundSize = `${percent}% 100%`;
+      };
+      slider.addEventListener("input", () => {
+        valueInput.value = slider.value;
+        state.generationState[key] = Number(slider.value);
+        updateSliderBg();
+      });
+      valueInput.addEventListener("change", () => {
+        slider.value = valueInput.value;
+        state.generationState[key] = Number(valueInput.value);
+        updateSliderBg();
+      });
+      updateSliderBg();
+    });
+
+    const textareas = node.querySelectorAll("textarea");
+    textareas.forEach((textarea) => {
+      const key = textarea.dataset.key;
+      const autoResize = () => {
         textarea.style.height = "auto";
         textarea.style.height = `${textarea.scrollHeight}px`;
       };
-      textarea.addEventListener("input", update);
-      update();
-    };
-
-    const createDropdown = (container, key, options, defaultVal) => {
-      container.innerHTML = "";
-      const selected = document.createElement("div");
-      selected.className = "dropdown-selected";
-      selected.textContent =
-        state.generationState[key] || defaultVal || "Select...";
-      const optionsList = document.createElement("ul");
-      optionsList.className = "dropdown-options";
-      if (key === "lora_name") options = ["None", ...options];
-
-      options.forEach((opt) => {
-        const optionEl = document.createElement("li");
-        optionEl.className = "dropdown-option";
-        optionEl.textContent = opt;
-        optionEl.dataset.value = opt;
-        optionsList.appendChild(optionEl);
-      });
-      container.append(selected, optionsList);
-      container.addEventListener("click", (e) => {
-        if (e.target.matches(".dropdown-option")) {
-          state.generationState[key] =
-            e.target.dataset.value === "None" ? null : e.target.dataset.value;
-          selected.textContent = e.target.textContent;
-          container.classList.remove("open");
-        } else {
-          container.classList.toggle("open");
-        }
-      });
-    };
-
-    node.querySelectorAll(".slider-input-group").forEach((group) => {
-      const rangeInput = group.querySelector('input[type="range"]');
-      const numberInput = group.querySelector('input[type="number"]');
-      const key = rangeInput.dataset.key;
-
-      const updateRangeBg = (input) => {
-        const percent =
-          ((input.value - input.min) / (input.max - input.min)) * 100;
-        input.style.backgroundSize = `${percent}% 100%`;
-      };
-
-      rangeInput.addEventListener("input", () => {
-        const value = rangeInput.step.includes(".")
-          ? parseFloat(rangeInput.value).toFixed(2)
-          : rangeInput.value;
-        numberInput.value = value;
-        state.generationState[key] = parseFloat(value);
-        updateRangeBg(rangeInput);
-      });
-      numberInput.addEventListener("change", () => {
-        let value = parseFloat(numberInput.value);
-        value = Math.max(
-          parseFloat(rangeInput.min),
-          Math.min(parseFloat(rangeInput.max), value)
-        );
-        if (isNaN(value)) value = state.generationState[key];
-        numberInput.value = value;
-        rangeInput.value = value;
-        state.generationState[key] = value;
-        updateRangeBg(rangeInput);
-      });
-      updateRangeBg(rangeInput);
-    });
-
-    node.querySelectorAll("textarea.form-textarea").forEach((textarea) => {
-      setupAutoresize(textarea);
       textarea.addEventListener("input", () => {
-        state.generationState[textarea.dataset.key] = textarea.value;
+        state.generationState[key] = textarea.value;
+        autoResize();
       });
+      setTimeout(autoResize, 0);
     });
-
-    node.querySelectorAll("input.form-input").forEach((input) => {
-      const key = input.dataset.key;
-      input.addEventListener(
-        "change",
-        () => (state.generationState[key] = parseInt(input.value))
-      );
-    });
-
-    if (type === "model_sampler") {
-      const modelDropdownContainer = node.querySelector(
-        '.custom-dropdown[data-key="model_name"]'
-      );
-      const samplerDropdownContainer = node.querySelector(
-        '.custom-dropdown[data-key="scheduler_name"]'
-      );
-      const rebuildModelDropdown = (models) =>
-        createDropdown(
-          modelDropdownContainer,
-          "model_name",
-          models,
-          "Select a model"
-        );
-
-      fetch("/api/config")
-        .then((r) => r.json())
-        .then((config) => {
-          state.settings.models = config.models;
-          state.settings.loras = config.loras;
-          rebuildModelDropdown(config.models);
-          createDropdown(
-            samplerDropdownContainer,
-            "scheduler_name",
-            config.schedulers,
-            "Euler A"
-          );
-        });
-
-      node
-        .querySelector("#node-refresh-models")
-        .addEventListener("click", (e) => {
-          e.stopPropagation();
-          fetch("/api/config")
-            .then((r) => r.json())
-            .then((config) => {
-              state.settings.models = config.models;
-              rebuildModelDropdown(config.models);
-            });
-        });
-
-      node
-        .querySelector("#node-unload-model")
-        .addEventListener("click", (e) => {
-          e.stopPropagation();
-          sendMessage("unload_model");
-        });
-    }
 
     if (type === "parameters") {
       node.querySelector("#random-seed").addEventListener("click", () => {
-        const newSeed = Math.floor(Math.random() * 2 ** 32);
-        state.generationState.seed = newSeed;
-        node.querySelector('input[data-key="seed"]').value = newSeed;
+        updateNodeUI("parameters", { seed: -1 });
       });
-      node.querySelectorAll(".aspect-ratio-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const [w, h] = btn.dataset.ratio.split(":").map(Number);
-          const isVertical = h > w;
-          const baseSize =
-            state.generationState.width > 768
-              ? 1024
-              : state.generationState.width > 512
-              ? 768
-              : 512;
-          let newWidth, newHeight;
-          if (w === h) {
-            newWidth = baseSize;
-            newHeight = baseSize;
-          } else if (isVertical) {
-            newHeight = baseSize;
-            newWidth = Math.round((baseSize * w) / h / 64) * 64;
-          } else {
-            newWidth = baseSize;
-            newHeight = Math.round((baseSize * h) / w / 64) * 64;
-          }
-          updateNodeUI("parameters", { width: newWidth, height: newHeight });
-        });
-      });
+      node
+        .querySelectorAll(".aspect-ratio-btn")
+        .forEach((btn) =>
+          btn.addEventListener("click", () => setAspectRatio(btn.dataset.ratio))
+        );
     }
 
     if (type === "image_preview") {
       node.querySelector("#view-image-btn").addEventListener("click", () => {
-        if (state.lastGeneratedImage) {
-          const imgIndex = state.galleryImages.indexOf(
-            state.lastGeneratedImage
-          );
-          if (imgIndex !== -1) openLightbox(imgIndex);
-        }
-      });
-      node.querySelector("#delete-image-btn").addEventListener("click", () => {
-        if (state.lastGeneratedImage) {
-          showDialog(
-            "Confirm Deletion",
-            `Delete <strong>${state.lastGeneratedImage}</strong>?`,
-            [
-              { text: "Cancel" },
-              {
-                text: "Delete",
-                class: "btn-danger",
-                callback: () => {
-                  sendMessage("delete_image", {
-                    filename: state.lastGeneratedImage,
-                  });
-                  state.lastGeneratedImage = null;
-                  updateNodeUI("image_preview", { image: null });
-                },
-              },
-            ]
-          );
-        }
-      });
-    }
-
-    if (type === "lora") {
-      const loraDropdownContainer = node.querySelector(
-        '.custom-dropdown[data-key="lora_name"]'
-      );
-      fetch("/api/config")
-        .then((r) => r.json())
-        .then((config) =>
-          createDropdown(
-            loraDropdownContainer,
-            "lora_name",
-            config.loras,
-            "None"
-          )
+        const index = state.galleryImages.findIndex(
+          (img) => img.filename === state.lastGeneratedImage
         );
+        if (index !== -1) openLightbox(index);
+      });
     }
 
-    if (!isPermanent) {
-      node.querySelector(".node-delete").addEventListener("click", () => {
-        if (type === "lora") state.generationState.lora_name = null;
+    if (!node.classList.contains("permanent")) {
+      const deleteBtn = node.querySelector(".node-delete");
+      deleteBtn?.addEventListener("click", () => {
         node.remove();
         state.nodes.delete(type);
+        const dockBtn = ui.node.dock.querySelector(
+          `.node-dock-button[data-node-type="${type}"]`
+        );
+        if (dockBtn) dockBtn.classList.remove("active");
       });
     }
   }
@@ -736,158 +729,150 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateNodeUI(type, updates) {
     const node = state.nodes.get(type)?.el;
     if (!node) return;
-    if (type === "model_sampler") {
-      if (updates.status)
-        node.querySelector("#model-status").textContent = updates.status;
-      node.querySelector("#node-unload-model").disabled = !updates.loaded;
-      ui.node.generateBtn.disabled = !updates.loaded;
-    }
-    if (type === "image_preview") {
-      const progressOverlay = node.querySelector(".progress-overlay");
-      const viewBtn = node.querySelector("#view-image-btn");
-      const deleteBtn = node.querySelector("#delete-image-btn");
-
-      if (updates.clearProgress) progressOverlay.classList.remove("visible");
-      if (updates.progress !== undefined) {
-        progressOverlay.classList.add("visible");
-        node.querySelector(".progress-bar-inner").style.width = `${
-          updates.progress * 100
-        }%`;
-        node.querySelector(".progress-text").textContent = updates.description;
-      }
-      if (updates.image !== undefined) {
+    for (const [key, value] of Object.entries(updates)) {
+      if (key === "status") {
+        node.querySelector("#model-status").textContent = value;
+      } else if (key === "loaded") {
+        node.querySelector("#model-status").style.color = value
+          ? "var(--status-green)"
+          : "var(--text-color)";
+      } else if (key === "max_res") {
+        const infoEl = node.querySelector("#max-res-info");
+        infoEl.innerHTML = value
+          ? `Est. Max VRAM Res: <strong>${value}x${value}</strong>`
+          : "Load a model for VRAM estimate.";
+      } else if (key === "image") {
         const img = node.querySelector(".preview-img");
         const placeholder = node.querySelector(".placeholder");
-        if (updates.image) {
-          img.src = `/outputs/${updates.image}`;
-          img.classList.remove("hidden");
-          placeholder.classList.add("hidden");
-        } else {
-          img.src = "";
-          img.classList.add("hidden");
-          placeholder.classList.remove("hidden");
+        img.src = `/outputs/${value}`;
+        img.classList.remove("hidden");
+        placeholder.classList.add("hidden");
+        node.querySelector("#view-image-btn").disabled = false;
+      } else if (key === "info") {
+        node.querySelector("#image-info-text").textContent = value;
+      } else if (key === "models" || key === "schedulers" || key === "loras") {
+        const dropdownKey =
+          key === "models"
+            ? "model_name"
+            : key === "loras"
+            ? "lora_name"
+            : "scheduler_name";
+        const container = node.querySelector(
+          `.custom-dropdown[data-key="${dropdownKey}"]`
+        );
+        if (container) createCustomDropdown(container, value, dropdownKey);
+      } else {
+        const input = node.querySelector(`[data-key="${key}"]`);
+        if (input) {
+          if (
+            input.type === "range" ||
+            input.type === "number" ||
+            input.tagName === "TEXTAREA"
+          ) {
+            input.value = value;
+            state.generationState[key] = value;
+            if (input.type === "range") {
+              const valueInput = node.querySelector(
+                `input[data-value-for="${key}"]`
+              );
+              if (valueInput) valueInput.value = value;
+              const percent =
+                ((input.value - input.min) / (input.max - input.min)) * 100;
+              input.style.backgroundSize = `${percent}% 100%`;
+            }
+            if (input.tagName === "TEXTAREA") {
+              input.style.height = "auto";
+              input.style.height = `${input.scrollHeight}px`;
+            }
+          }
         }
-        viewBtn.disabled = !updates.image;
-        deleteBtn.disabled = !updates.image;
       }
     }
-    if (type === "parameters") {
-      if (updates.width) {
-        const input = node.querySelector('input[data-key="width"]');
-        input.value = updates.width;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      if (updates.height) {
-        const input = node.querySelector('input[data-key="height"]');
-        input.value = updates.height;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      if (updates.max_res !== undefined) {
-        const infoEl = node.querySelector("#max-res-info");
-        infoEl.innerHTML = updates.max_res
-          ? `Recommended Max: <strong>${updates.max_res}px</strong>`
-          : "";
-      }
+  }
+
+  function setAspectRatio(ratio) {
+    const node = state.nodes.get("parameters")?.el;
+    if (!node) return;
+    node
+      .querySelectorAll(".aspect-ratio-btn")
+      .forEach((b) => b.classList.remove("active"));
+    node
+      .querySelector(`.aspect-ratio-btn[data-ratio="${ratio}"]`)
+      .classList.add("active");
+
+    const isLandscape = ratio === "4:3";
+    const isPortrait = ratio === "3:4";
+    const width = state.generationState.width;
+    const height = state.generationState.height;
+    let newWidth, newHeight;
+
+    if (isLandscape) {
+      const smallerDim = Math.min(width, height);
+      newWidth = Math.round((smallerDim * 4) / 3 / 64) * 64;
+      newHeight = smallerDim;
+    } else if (isPortrait) {
+      const smallerDim = Math.min(width, height);
+      newWidth = smallerDim;
+      newHeight = Math.round((smallerDim * 4) / 3 / 64) * 64;
+    } else {
+      newWidth = newHeight = Math.min(width, height);
     }
+    updateNodeUI("parameters", { width: newWidth, height: newHeight });
   }
 
   function initDock() {
     ui.node.dockButtons.forEach((button) => {
       const type = button.dataset.nodeType;
-      const isToggle = ["vae_tiling", "cpu_offload"].includes(type);
-
-      button.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        if (isToggle) {
-          state.generationState[type] = !state.generationState[type];
-          button.classList.toggle("active", state.generationState[type]);
-          if (state.isModelLoaded)
-            showDialog(
-              "Info",
-              "This setting requires a model reload to take effect.",
-              [{ text: "OK" }]
-            );
-          return;
-        }
-        const tempNode = button.cloneNode(true);
-        Object.assign(tempNode.style, {
-          position: "fixed",
-          zIndex: "9999",
-          opacity: "0.8",
-          pointerEvents: "none",
-          left: `${e.clientX - 25}px`,
-          top: `${e.clientY - 25}px`,
+      if (["vae_tiling", "cpu_offload"].includes(type)) {
+        button.addEventListener("click", () => {
+          button.classList.toggle("active");
+          state.generationState[type] = button.classList.contains("active");
         });
-        document.body.appendChild(tempNode);
-        const onMouseMove = (moveEvent) => {
-          tempNode.style.left = `${moveEvent.clientX - 25}px`;
-          tempNode.style.top = `${moveEvent.clientY - 25}px`;
-        };
-        const onMouseUp = (upEvent) => {
-          document.removeEventListener("mousemove", onMouseMove);
-          document.body.removeChild(tempNode);
-          const canvasRect = ui.node.canvas.getBoundingClientRect();
-          if (
-            upEvent.clientX >= canvasRect.left &&
-            upEvent.clientX <= canvasRect.right &&
-            upEvent.clientY >= canvasRect.top &&
-            upEvent.clientY <= canvasRect.bottom
-          ) {
-            const x =
-              (upEvent.clientX - canvasRect.left - state.canvas.offsetX) /
-              state.canvas.scale;
-            const y =
-              (upEvent.clientY - canvasRect.top - state.canvas.offsetY) /
-              state.canvas.scale;
-            createNode(type, x, y);
+        if (state.generationState[type]) button.classList.add("active");
+      } else {
+        button.addEventListener("click", () => {
+          if (button.classList.contains("active")) return;
+          createNode(type, Math.random() * 400, Math.random() * 400 + 400);
+          button.classList.add("active");
+          if (type === "lora") {
+            updateNodeUI("lora", { loras: ["None", ...state.settings.loras] });
           }
-        };
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp, { once: true });
-      });
+        });
+      }
     });
 
     ui.node.loadModelBtn.addEventListener("click", () => {
-      if (!state.generationState.model_name) {
-        showDialog("Error", "Please select a model to load.", [{ text: "OK" }]);
-        return;
+      if (state.isModelLoaded) {
+        sendMessage("unload_model");
+      } else {
+        const { model_name, scheduler_name, vae_tiling, cpu_offload } =
+          state.generationState;
+        if (!model_name || model_name === "Select a model") {
+          showNotification("Please select a model first.", "error", 3000);
+          return;
+        }
+        sendMessage("load_model", {
+          model_name,
+          scheduler_name,
+          vae_tiling,
+          cpu_offload,
+          lora_name: state.generationState.lora_name,
+        });
       }
-      updateNodeUI("model_sampler", {
-        status: "Loading model...",
-        loaded: false,
-      });
-      updateNodeUI("image_preview", {
-        showProgress: true,
-        description: "Loading...",
-      });
-      const payload = {
-        model_name: state.generationState.model_name,
-        scheduler_name: state.generationState.scheduler_name,
-        lora_name: state.generationState.lora_name,
-        vae_tiling: state.generationState.vae_tiling,
-        cpu_offload: state.generationState.cpu_offload,
-      };
-      sendMessage("load_model", payload);
     });
 
     ui.node.generateBtn.addEventListener("click", () => {
-      updateNodeUI("image_preview", {
-        showProgress: true,
-        description: "Starting...",
-      });
+      if (!state.isModelLoaded) {
+        showNotification("No model is loaded.", "error", 3000);
+        return;
+      }
       const payload = { ...state.generationState };
-      payload.lora_weight = state.generationState.lora_name
-        ? state.generationState.lora_weight
-        : 0;
+      if (payload.seed === -1) {
+        payload.seed = Math.floor(Math.random() * 2 ** 32);
+        updateNodeUI("parameters", { seed: payload.seed });
+      }
       sendMessage("generate_image", payload);
     });
-
-    document
-      .querySelector('[data-node-type="vae_tiling"]')
-      .classList.toggle("active", state.generationState.vae_tiling);
-    document
-      .querySelector('[data-node-type="cpu_offload"]')
-      .classList.toggle("active", state.generationState.cpu_offload);
   }
 
   async function loadPrompts() {
@@ -895,65 +880,83 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/api/prompts");
       state.prompts = await response.json();
       populatePromptBook(state.prompts);
-    } catch (error) {
-      console.error("Error loading prompts:", error);
+    } catch (e) {
+      showNotification("Could not load prompts.", "error", 3000);
     }
   }
 
   function populatePromptBook(prompts) {
     ui.promptBook.grid.innerHTML = "";
-    const hasPrompts = prompts.length > 0;
-    ui.promptBook.placeholder.classList.toggle("hidden", hasPrompts);
+    const hasPrompts = prompts && prompts.length > 0;
+    ui.promptBook.placeholder.classList.toggle("hidden", !hasPrompts);
     if (hasPrompts) {
       prompts.forEach((p, index) => {
         const item = document.createElement("div");
-        item.className = "gallery-item";
-        item.innerHTML = `<div class="prompt-item-content"><h4>${
-          p.title
-        }</h4><p><strong>Prompt:</strong> ${p.prompt}</p>${
-          p.negative_prompt
-            ? `<p><strong>Negative:</strong> ${p.negative_prompt}</p>`
-            : ""
-        }</div><div class="image-actions-overlay"><button class="image-action-btn" data-action="use" data-index="${index}" title="Use Prompt"><span class="material-symbols-outlined">add_task</span></button><button class="image-action-btn" data-action="edit" data-index="${index}" title="Edit Prompt"><span class="material-symbols-outlined">edit</span></button><button class="image-action-btn" data-action="delete" data-index="${index}" title="Delete Prompt"><span class="material-symbols-outlined">delete</span></button></div>`;
+        item.className = "prompt-card";
+        item.innerHTML = `
+          <div class="prompt-card-header">
+            <h3 class="prompt-card-title">${p.title}</h3>
+            <div class="prompt-card-actions">
+              <button class="icon-btn" data-action="edit" data-index="${index}" title="Edit"><span class="material-symbols-outlined">edit</span></button>
+              <button class="icon-btn" data-action="delete" data-index="${index}" title="Delete"><span class="material-symbols-outlined">delete</span></button>
+            </div>
+          </div>
+          <p class="prompt-card-content">${p.prompt}</p>
+          <div class="prompt-card-footer">
+            <button class="btn btn-primary" data-action="use" data-index="${index}"><span class="material-symbols-outlined">add_task</span> Use Prompt</button>
+          </div>`;
         ui.promptBook.grid.appendChild(item);
       });
     }
   }
 
+  function openPromptEditor(promptData = null) {
+    const isEditing = promptData !== null;
+    ui.promptBook.editor.title.textContent = isEditing
+      ? "Edit Prompt"
+      : "Add New Prompt";
+    ui.promptBook.editor.titleInput.value = isEditing ? promptData.title : "";
+    ui.promptBook.editor.promptInput.value = isEditing ? promptData.prompt : "";
+    ui.promptBook.editor.negativeInput.value = isEditing
+      ? promptData.negative_prompt
+      : "";
+    ui.promptBook.editor._oldTitle = isEditing ? promptData.title : null;
+
+    const saveBtn = `<button id="save-prompt-btn" class="btn btn-primary">Save</button>`;
+    const cancelBtn = `<button id="cancel-prompt-btn" class="btn btn-secondary">Cancel</button>`;
+    ui.promptBook.editor.buttons.innerHTML = cancelBtn + saveBtn;
+
+    ui.promptBook.editor.overlay.classList.remove("hidden");
+    ui.promptBook.editor.titleInput.focus();
+
+    document
+      .getElementById("save-prompt-btn")
+      .addEventListener("click", savePrompt);
+    document
+      .getElementById("cancel-prompt-btn")
+      .addEventListener("click", () =>
+        ui.promptBook.editor.overlay.classList.add("hidden")
+      );
+  }
+
   function handlePromptBookClick(e) {
-    const button = e.target.closest(".image-action-btn");
+    const button = e.target.closest("button[data-action]");
     if (!button) return;
     const { action, index } = button.dataset;
     const prompt = state.prompts[index];
-
     if (action === "use") {
-      const promptNode = state.nodes.get("prompt")?.el;
-      if (!promptNode) return;
-      state.generationState.prompt = prompt.prompt;
-      state.generationState.negative_prompt = prompt.negative_prompt || "";
-      const promptTextarea = promptNode.querySelector('[data-key="prompt"]');
-      const negPromptTextarea = promptNode.querySelector(
-        '[data-key="negative_prompt"]'
-      );
-      promptTextarea.value = prompt.prompt;
-      negPromptTextarea.value = prompt.negative_prompt || "";
-      promptTextarea.dispatchEvent(new Event("input", { bubbles: true }));
-      negPromptTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+      updateNodeUI("prompt", {
+        prompt: prompt.prompt,
+        negative_prompt: prompt.negative_prompt,
+      });
+      showNotification(`Loaded prompt: ${prompt.title}`, "success", 2000);
       ui.navLinks[0].click();
     } else if (action === "edit") {
-      const { editor } = ui.promptBook;
-      editor._oldTitle = prompt.title;
-      editor.title.textContent = "Edit Prompt";
-      editor.titleInput.value = prompt.title;
-      editor.promptInput.value = prompt.prompt;
-      editor.negativeInput.value = prompt.negative_prompt || "";
-      editor.promptInput.dispatchEvent(new Event("input", { bubbles: true }));
-      editor.negativeInput.dispatchEvent(new Event("input", { bubbles: true }));
-      editor.overlay.classList.remove("hidden");
+      openPromptEditor(prompt);
     } else if (action === "delete") {
       showDialog(
-        "Confirm Deletion",
-        `Delete prompt "<strong>${prompt.title}</strong>"?`,
+        "Delete Prompt",
+        `Are you sure you want to delete "${prompt.title}"?`,
         [
           { text: "Cancel" },
           {
@@ -967,29 +970,41 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function savePrompt() {
-    const { editor } = ui.promptBook;
-    const body = {
-      old_title: editor._oldTitle,
-      new_title: editor.titleInput.value,
-      prompt: editor.promptInput.value,
-      negative_prompt: editor.negativeInput.value,
+    const old_title = ui.promptBook.editor._oldTitle;
+    const prompt = {
+      new_title: ui.promptBook.editor.titleInput.value.trim(),
+      prompt: ui.promptBook.editor.promptInput.value.trim(),
+      negative_prompt: ui.promptBook.editor.negativeInput.value.trim(),
     };
+    if (!prompt.new_title || !prompt.prompt) {
+      showNotification("Title and Prompt are required.", "error");
+      return;
+    }
+
+    const isEditing = old_title !== null;
+    const url = "/api/prompts";
+    const method = isEditing ? "PUT" : "POST";
+    const body = isEditing ? { old_title, ...prompt } : prompt;
+
     try {
-      const response = await fetch("/api/prompts", {
-        method: editor._oldTitle ? "PUT" : "POST",
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if ((await response.json()).success) {
-        editor.overlay.classList.add("hidden");
+      const result = await response.json();
+      if (result.success) {
+        showNotification(
+          `Prompt ${isEditing ? "updated" : "saved"}!`,
+          "success"
+        );
+        ui.promptBook.editor.overlay.classList.add("hidden");
         loadPrompts();
       } else {
-        showDialog("Error", "Failed to save prompt. Title may already exist.", [
-          { text: "OK" },
-        ]);
+        showNotification("A prompt with that title already exists.", "error");
       }
-    } catch (error) {
-      console.error("Error saving prompt:", error);
+    } catch (e) {
+      showNotification("Error saving prompt.", "error");
     }
   }
 
@@ -1000,9 +1015,15 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title }),
       });
-      if ((await response.json()).success) loadPrompts();
-    } catch (error) {
-      console.error("Error deleting prompt:", error);
+      const result = await response.json();
+      if (result.success) {
+        showNotification("Prompt deleted.", "success");
+        loadPrompts();
+      } else {
+        showNotification("Error deleting prompt.", "error");
+      }
+    } catch (e) {
+      showNotification("Error deleting prompt.", "error");
     }
   }
 
@@ -1015,37 +1036,36 @@ document.addEventListener("DOMContentLoaded", () => {
       sendMessage("clear_cache")
     );
 
-    document
-      .querySelectorAll(".autoresize-textarea-wrapper textarea")
-      .forEach((textarea) => {
-        const wrapper = textarea.parentElement;
-        wrapper.dataset.replicatedValue = textarea.value;
-        textarea.addEventListener("input", () => {
-          wrapper.dataset.replicatedValue = textarea.value;
-        });
-      });
-
     ui.navLinks.forEach((link) => {
       link.addEventListener("click", (e) => {
         e.preventDefault();
+        const targetId = `page-${link.dataset.target}`;
+        document
+          .querySelectorAll(".page-content")
+          .forEach((p) => p.classList.add("hidden"));
+        document.getElementById(targetId).classList.remove("hidden");
         ui.navLinks.forEach((l) => l.classList.remove("active"));
         link.classList.add("active");
-        Object.values(ui.pages).forEach((p) => p.classList.add("hidden"));
-        const targetPage = document.getElementById(
-          `page-${link.dataset.target}`
-        );
-        if (targetPage) targetPage.classList.remove("hidden");
-        if (link.dataset.target === "prompt-book") loadPrompts();
-        if (link.dataset.target === "settings")
+        if (targetId === "page-gallery") {
+          ui.gallery.refreshBtn.click();
+        }
+        if (targetId === "page-prompt-book") loadPrompts();
+        if (targetId === "page-settings") {
           sendMessage("get_settings_data");
+        }
       });
     });
 
-    ui.gallery.refreshBtn.addEventListener("click", () =>
-      fetch("/api/config")
-        .then((r) => r.json())
-        .then((c) => populateGallery(c.gallery_images.map((i) => i.filename)))
-    );
+    ui.gallery.refreshBtn.addEventListener("click", () => {
+      fetch("/api/gallery")
+        .then((res) => res.json())
+        .then((data) => populateGallery(data.images));
+    });
+
+    ui.promptBook.refreshBtn.addEventListener("click", loadPrompts);
+    ui.promptBook.addBtn.addEventListener("click", () => openPromptEditor());
+    ui.promptBook.grid.addEventListener("click", handlePromptBookClick);
+
     ui.settings.refreshModelsBtn.addEventListener("click", () =>
       sendMessage("get_settings_data")
     );
@@ -1054,31 +1074,40 @@ document.addEventListener("DOMContentLoaded", () => {
     );
 
     ui.lightbox.closeBtn.addEventListener("click", closeLightbox);
-    ui.lightbox.prevBtn.addEventListener("click", () =>
-      showLightboxImage(state.currentLightboxIndex - 1)
-    );
     ui.lightbox.nextBtn.addEventListener("click", () =>
-      showLightboxImage(state.currentLightboxIndex + 1)
+      showLightboxImage(
+        (state.currentLightboxIndex + 1) % state.galleryImages.length
+      )
+    );
+    ui.lightbox.prevBtn.addEventListener("click", () =>
+      showLightboxImage(
+        (state.currentLightboxIndex - 1 + state.galleryImages.length) %
+          state.galleryImages.length
+      )
     );
     ui.lightbox.zoomInBtn.addEventListener("click", () => {
-      state.zoomLevel = Math.min(5, state.zoomLevel + 0.2);
+      state.zoomLevel = Math.min(5, state.zoomLevel * 1.2);
       updateImageTransform();
     });
     ui.lightbox.zoomOutBtn.addEventListener("click", () => {
-      state.zoomLevel = Math.max(0.2, state.zoomLevel - 0.2);
+      state.zoomLevel = Math.max(0.2, state.zoomLevel / 1.2);
       updateImageTransform();
     });
     ui.lightbox.fitBtn.addEventListener("click", resetZoomAndPan);
     ui.lightbox.deleteBtn.addEventListener("click", () => {
-      const filename = state.galleryImages[state.currentLightboxIndex];
-      showDialog("Confirm Deletion", `Delete <strong>${filename}</strong>?`, [
-        { text: "Cancel" },
-        {
-          text: "Delete",
-          class: "btn-danger",
-          callback: () => sendMessage("delete_image", { filename }),
-        },
-      ]);
+      const filename = state.galleryImages[state.currentLightboxIndex].filename;
+      showDialog(
+        "Confirm Deletion",
+        `Delete <strong>${filename}</strong>? This cannot be undone.`,
+        [
+          { text: "Cancel" },
+          {
+            text: "Delete",
+            class: "btn-danger",
+            callback: () => sendMessage("delete_image", { filename }),
+          },
+        ]
+      );
     });
     ui.lightbox.imageWrapper.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
@@ -1089,45 +1118,21 @@ document.addEventListener("DOMContentLoaded", () => {
       };
       ui.lightbox.imageWrapper.style.cursor = "grabbing";
     });
-    window.addEventListener("mousemove", (e) => {
-      if (state.isPanning) {
-        state.panCurrent = {
-          x: e.clientX - state.panStart.x,
-          y: e.clientY - state.panStart.y,
-        };
-        updateImageTransform();
-      }
+    document.addEventListener("mousemove", (e) => {
+      if (!state.isPanning) return;
+      state.panCurrent.x = e.clientX - state.panStart.x;
+      state.panCurrent.y = e.clientY - state.panStart.y;
+      updateImageTransform();
     });
-    window.addEventListener("mouseup", () => {
-      if (state.isPanning) {
-        state.isPanning = false;
-        ui.lightbox.imageWrapper.style.cursor = "grab";
-      }
+    document.addEventListener("mouseup", () => {
+      state.isPanning = false;
+      ui.lightbox.imageWrapper.style.cursor = "grab";
     });
-
-    ui.promptBook.addBtn.addEventListener("click", () => {
-      const { editor } = ui.promptBook;
-      editor._oldTitle = null;
-      editor.title.textContent = "Add New Prompt";
-      editor.titleInput.value = "";
-      editor.promptInput.value = "";
-      editor.negativeInput.value = "";
-      editor.promptInput.dispatchEvent(new Event("input", { bubbles: true }));
-      editor.negativeInput.dispatchEvent(new Event("input", { bubbles: true }));
-      editor.overlay.classList.remove("hidden");
+    ui.lightbox.imageWrapper.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      if (e.deltaY < 0) ui.lightbox.zoomInBtn.click();
+      else ui.lightbox.zoomOutBtn.click();
     });
-    ui.promptBook.refreshBtn.addEventListener("click", loadPrompts);
-    ui.promptBook.grid.addEventListener("click", handlePromptBookClick);
-    ui.promptBook.editor.buttons.innerHTML =
-      '<button id="save-prompt-btn" class="btn btn-primary">Save</button><button id="cancel-prompt-btn" class="btn btn-secondary">Cancel</button>';
-    document
-      .getElementById("save-prompt-btn")
-      .addEventListener("click", savePrompt);
-    document
-      .getElementById("cancel-prompt-btn")
-      .addEventListener("click", () =>
-        ui.promptBook.editor.overlay.classList.add("hidden")
-      );
   }
 
   async function init() {
@@ -1140,17 +1145,39 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const response = await fetch("/api/config");
       const config = await response.json();
-      populateGallery(config.gallery_images.map((img) => img.filename));
-      createNode("model_sampler", 50, 50);
-      createNode("prompt", 50, 350);
-      createNode("parameters", 400, 50);
-      createNode("image_preview", 750, 50);
+      state.settings.models = config.models;
+      state.settings.loras = config.loras;
+      populateGallery(config.gallery_images);
+      state.prompts = config.prompts;
+      populatePromptBook(config.prompts);
+
+      const nodeSpacing = 40;
+      const nodeWidth = 320;
+      let currentX = 0;
+
+      createNode("model_sampler", currentX, 150);
+      currentX += nodeWidth + nodeSpacing;
+
+      createNode("prompt", currentX, 50);
+      currentX += nodeWidth + nodeSpacing;
+
+      createNode("parameters", currentX, 0);
+      currentX += nodeWidth + nodeSpacing;
+
+      createNode("image_preview", currentX, 150);
+
+      updateNodeUI("model_sampler", {
+        models: config.models,
+        schedulers: config.schedulers,
+      });
+
+      centerView();
     } catch (error) {
       console.error("Failed to fetch initial config:", error);
-      showDialog(
-        "Initialization Error",
+      showNotification(
         "Could not load configuration from the server.",
-        [{ text: "OK" }]
+        "error",
+        5000
       );
     }
   }
