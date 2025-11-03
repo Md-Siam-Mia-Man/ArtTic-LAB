@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 from core import logic as core
 from core.logic import OOMError
+import os
 
 APP_LOGGER_NAME = "arttic_lab"
 logger = logging.getLogger(APP_LOGGER_NAME)
@@ -14,6 +15,10 @@ app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
 app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
+app.mount("/fonts", StaticFiles(directory="web/fonts"), name="fonts")
+
+if os.path.exists("web/node_modules"):
+    app.mount("/npm", StaticFiles(directory="web/node_modules"), name="npm")
 
 env = Environment(loader=FileSystemLoader("web/templates"))
 index_template = env.get_template("index.html")
@@ -24,9 +29,19 @@ async def read_root():
     return index_template.render()
 
 
+@app.get("/api/status")
+async def get_status():
+    return core.get_app_status()
+
+
 @app.get("/api/config")
 async def get_initial_config():
     return core.get_config()
+
+
+@app.get("/api/gallery")
+async def get_gallery_images():
+    return {"images": core.get_output_images()}
 
 
 @app.get("/api/prompts")
