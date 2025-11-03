@@ -46,29 +46,88 @@ ArtTic-LAB adapts to your preferred workflow — visual or terminal-based.
 
 ## ⚙️ Feature Deep Dive
 
-| Category                       | Highlights                                                                                                                                                              |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Engineered for Speed 🏎️**    | - **IPEX Optimization:** Intel® Extension for PyTorch optimizes UNet & VAE.<br>- **Mixed Precision:** Runs in `bfloat16` for ~2× faster performance & 50% VRAM savings. |
-| **Intelligent Pipeline 🧠**    | - Auto-detects architecture (SD1.5 → SD3 → FLUX).<br>- Predicts VRAM-safe maximum resolution to prevent OOM errors.                                                     |
-| **Total VRAM Control 💧**      | - One-click model unload & VAE tiling for high-res stability.<br>- Adaptive CPU/GPU offloading for efficient memory use.                                                |
-| **Streamlined for Artists ✨** | - Responsive async UI — no freezes.<br>- Unified node-based interface for full creative control.<br>- Smooth gallery with zoom & drag support.                          |
+| Category                       | Highlights                                                                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Engineered for Speed 🏎️**    | - **IPEX Optimization:** Intel® Extension for PyTorch optimizes UNet & VAE.<br>- **Mixed Precision:** Runs in `bfloat16` for ~2× faster performance & ~50% VRAM savings. |
+| **Intelligent Pipeline 🧠**    | - Auto-detects architecture (SD1.5 → SD3 → FLUX).<br>- Predicts VRAM-safe maximum resolution to prevent OOM errors.                                                      |
+| **Total VRAM Control 💧**      | - One-click model unload & VAE tiling for high-res stability.<br>- Adaptive CPU/GPU offloading for efficient memory use.                                                 |
+| **Streamlined for Artists ✨** | - Responsive async UI — no freezes.<br>- Unified node-based interface for full creative control.<br>- Smooth gallery with zoom & drag support.                           |
 
 ---
 
 ## 📸 Creations Gallery
 
-| Demo 1 | Demo 2 | Demo 3 |
-|--------|--------|--------|
-| <img src="assets/demos/1.png" width="256" height="256"> | <img src="assets/demos/2.png" width="256" height="256"> | <img src="assets/demos/3.png" width="256" height="256"> |
+> Each image is displayed inside a consistent **512×512** viewport. Images preserve their original aspect ratio and are centered and scaled to fit. This keeps the gallery tidy while avoiding distortion.
 
-| Demo 4 | Demo 5 | Demo 6 |
-|--------|--------|--------|
-| <img src="assets/demos/4.png" width="256" height="256"> | <img src="assets/demos/5.png" width="256" height="256"> | <img src="assets/demos/6.png" width="256" height="256"> |
+<table>
+  <tr>
+    <td align="center">
+      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+        <img src="assets/demos/1.png" alt="Demo 1" style="max-width:100%;max-height:100%;object-fit:contain;">
+      </div>
+      <p>Demo 1</p>
+    </td>
+    <td align="center">
+      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+        <img src="assets/demos/2.png" alt="Demo 2" style="max-width:100%;max-height:100%;object-fit:contain;">
+      </div>
+      <p>Demo 2</p>
+    </td>
+    <td align="center">
+      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+        <img src="assets/demos/3.png" alt="Demo 3" style="max-width:100%;max-height:100%;object-fit:contain;">
+      </div>
+      <p>Demo 3</p>
+    </td>
+  </tr>
 
-| Demo 7 | Demo 9 | Demo 10 |
-|--------|--------|---------|
-| <img src="assets/demos/7.png" width="256" height="256"> | <img src="assets/demos/9.png" width="256" height="256"> | <img src="assets/demos/10.png" width="256" height="256"> |
+  <tr>
+    <td align="center">
+      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+        <img src="assets/demos/4.png" alt="Demo 4" style="max-width:100%;max-height:100%;object-fit:contain;">
+      </div>
+      <p>Demo 4</p>
+    </td>
+    <td align="center">
+      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+        <img src="assets/demos/5.png" alt="Demo 5" style="max-width:100%;max-height:100%;object-fit:contain;">
+      </div>
+      <p>Demo 5</p>
+    </td>
+    <td align="center">
+      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+        <img src="assets/demos/6.png" alt="Demo 6" style="max-width:100%;max-height:100%;object-fit:contain;">
+      </div>
+      <p>Demo 6</p>
+    </td>
+  </tr>
 
+  <tr>
+    <td align="center">
+      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+        <img src="assets/demos/7.png" alt="Demo 7" style="max-width:100%;max-height:100%;object-fit:contain;">
+      </div>
+      <p>Demo 7</p>
+    </td>
+    <td align="center">
+      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+        <img src="assets/demos/9.png" alt="Demo 9" style="max-width:100%;max-height:100%;object-fit:contain;">
+      </div>
+      <p>Demo 9</p>
+    </td>
+    <td align="center">
+      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+        <img src="assets/demos/10.png" alt="Demo 10" style="max-width:100%;max-height:100%;object-fit:contain;">
+      </div>
+      <p>Demo 10</p>
+    </td>
+  </tr>
+</table>
+
+> Notes:
+>
+> - Each image uses `max-width:100%` and `max-height:100%` inside a fixed `512×512` container to preserve aspect ratio and avoid cropping.
+> - If a demo image is smaller than 512px in either dimension it will be centered at true size; if larger, it will scale down to fit inside the box.
 
 ---
 
@@ -121,5 +180,3 @@ ArtTic-LAB/
 ├── 📜start.bat      # Windows launcher
 └── 📜...            # Additional project files
 ```
-
-<p align="center"> Crafted with ❤️ by <a href="https://github.com/Md-Siam-Mia-Man">Md Siam Mia</a> <br> <sub>Empowering AI Artistry for the Intel® Arc™ Generation</sub> </p> ```
