@@ -11,3 +11,4 @@ Pillow
 toml
 pyngrok
 requests
+torchruntime

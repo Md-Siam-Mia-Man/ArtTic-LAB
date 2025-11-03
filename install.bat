@@ -71,29 +71,34 @@ call conda activate "%ENV_NAME%"
 echo [INFO] Upgrading pip...
 python -m pip install --upgrade pip --quiet
 
-echo.
-echo Please select your hardware for PyTorch installation:
-echo   1. Intel GPU (XPU)
-echo   2. NVIDIA (CUDA)
-echo   3. CPU only
-echo.
-choice /c 123 /m "Enter your choice (1, 2, or 3): "
-set hardware_choice=%errorlevel%
+echo [INFO] Installing base dependencies from requirements.txt...
+pip install -r requirements.txt
 
-if %hardware_choice%==1 (
+echo.
+echo [INFO] Automatically detecting hardware for PyTorch installation...
+set "DETECT_COMMAND=python -c "from torchruntime.device_db import get_gpus; from torchruntime.platform_detection import get_torch_platform; print(get_torch_platform(get_gpus()))""
+FOR /F "tokens=*" %%i IN ('%DETECT_COMMAND%') DO SET "TORCH_PLATFORM=%%i"
+
+if not defined TORCH_PLATFORM (
+    echo [ERROR] torchruntime failed to detect hardware. Please check your drivers.
+    pause
+    exit /b 1
+)
+echo [INFO] Detected platform: %TORCH_PLATFORM%
+echo [INFO] Installing hardware-specific dependencies...
+
+set "IS_CUDA="
+echo %TORCH_PLATFORM% | findstr /B "cu" >nul && set "IS_CUDA=true"
+
+if /I "%TORCH_PLATFORM%"=="xpu" (
     pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/xpu
     pip install intel-extension-for-pytorch==2.8.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
-)
-if %hardware_choice%==2 (
+) else if defined IS_CUDA (
     pip install torch torchvision torchaudio
-)
-if %hardware_choice%==3 (
+) else (
     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
     pip install intel-extension-for-pytorch --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
 )
-
-echo [INFO] Installing other dependencies from requirements.txt...
-pip install -r requirements.txt
 
 rem 5. Install Web UI dependencies
 echo.

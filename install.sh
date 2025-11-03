@@ -143,34 +143,33 @@ conda activate "${ENV_NAME}"
 echo "[INFO] Upgrading pip..."
 python -m pip install --upgrade pip --quiet
 
-echo ""
-echo "Please select your hardware for PyTorch installation:"
-echo "  1. Intel GPU (XPU)"
-echo "  2. NVIDIA (CUDA)"
-echo "  3. CPU only"
-echo ""
-read -p "Enter your choice (1, 2, or 3): " hardware_choice
+echo "[INFO] Installing base dependencies from requirements.txt..."
+pip install -r requirements.txt
 
-case "$hardware_choice" in
-    1)
+echo ""
+echo "[INFO] Automatically detecting hardware for PyTorch installation..."
+DETECT_COMMAND="from torchruntime.device_db import get_gpus; from torchruntime.platform_detection import get_torch_platform; print(get_torch_platform(get_gpus()))"
+TORCH_PLATFORM=$(python -c "$DETECT_COMMAND")
+if [ $? -ne 0 ]; then
+    echo "[ERROR] torchruntime failed to detect hardware. Please check your drivers."
+    exit 1
+fi
+echo "[INFO] Detected platform: ${TORCH_PLATFORM}"
+echo "[INFO] Installing hardware-specific dependencies..."
+
+case "$TORCH_PLATFORM" in
+    xpu)
         pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/xpu
         pip install intel-extension-for-pytorch==2.8.10+xpu --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
         ;;
-    2)
+    cu*)
         pip install torch torchvision torchaudio
         ;;
-    3)
+    *)
         pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
         pip install intel-extension-for-pytorch --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
         ;;
-    *)
-        echo "[ERROR] Invalid choice. Aborting."
-        exit 1
-        ;;
 esac
-
-echo "[INFO] Installing other dependencies from requirements.txt..."
-pip install -r requirements.txt
 
 echo ""
 echo "[INFO] Installing Web UI dependencies..."
