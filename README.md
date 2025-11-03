@@ -62,19 +62,19 @@ ArtTic-LAB adapts to your preferred workflow — visual or terminal-based.
 <table>
   <tr>
     <td align="center">
-      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
         <img src="assets/demos/1.png" alt="Demo 1" style="max-width:100%;max-height:100%;object-fit:contain;">
       </div>
       <p>Demo 1</p>
     </td>
     <td align="center">
-      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
         <img src="assets/demos/2.png" alt="Demo 2" style="max-width:100%;max-height:100%;object-fit:contain;">
       </div>
       <p>Demo 2</p>
     </td>
     <td align="center">
-      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
         <img src="assets/demos/3.png" alt="Demo 3" style="max-width:100%;max-height:100%;object-fit:contain;">
       </div>
       <p>Demo 3</p>
@@ -83,19 +83,19 @@ ArtTic-LAB adapts to your preferred workflow — visual or terminal-based.
 
   <tr>
     <td align="center">
-      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
         <img src="assets/demos/4.png" alt="Demo 4" style="max-width:100%;max-height:100%;object-fit:contain;">
       </div>
       <p>Demo 4</p>
     </td>
     <td align="center">
-      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
         <img src="assets/demos/5.png" alt="Demo 5" style="max-width:100%;max-height:100%;object-fit:contain;">
       </div>
       <p>Demo 5</p>
     </td>
     <td align="center">
-      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
         <img src="assets/demos/6.png" alt="Demo 6" style="max-width:100%;max-height:100%;object-fit:contain;">
       </div>
       <p>Demo 6</p>
@@ -104,19 +104,19 @@ ArtTic-LAB adapts to your preferred workflow — visual or terminal-based.
 
   <tr>
     <td align="center">
-      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
         <img src="assets/demos/7.png" alt="Demo 7" style="max-width:100%;max-height:100%;object-fit:contain;">
       </div>
       <p>Demo 7</p>
     </td>
     <td align="center">
-      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
         <img src="assets/demos/9.png" alt="Demo 9" style="max-width:100%;max-height:100%;object-fit:contain;">
       </div>
       <p>Demo 9</p>
     </td>
     <td align="center">
-      <div style="width:256px;height:256px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
+      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
         <img src="assets/demos/10.png" alt="Demo 10" style="max-width:100%;max-height:100%;object-fit:contain;">
       </div>
       <p>Demo 10</p>
