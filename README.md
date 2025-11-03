@@ -1,7 +1,6 @@
 <p align="center">
   <img src="assets/Banner.png" alt="ArtTic-LAB Banner" width="100%"/>
 </p>
-<p align="center"><em>Built by creators, for creators.</em></p>
 
 <h2 align="center">Your Portal to AI Artistry, Forged for Intel ARC GPUs 🎨</h2>
 
@@ -18,18 +17,15 @@
   <a href="https://github.com/Md-Siam-Mia-Man/ArtTic-LAB/issues">
     <img src="https://img.shields.io/github/issues/Md-Siam-Mia-Man/ArtTic-LAB?style=for-the-badge" alt="Issues">
   </a>
-  <a href="https://github.com/Md-Siam-Mia-Man/ArtTic-LAB/commits/main">
-    <img src="https://img.shields.io/github/last-commit/Md-Siam-Mia-Man/ArtTic-LAB?style=for-the-badge&color=green" alt="Last Commit">
-  </a>
 </p>
 
 ---
 
-ArtTic-LAB is a **modern, performance-driven** AI image generation suite — precision-engineered for the Intel® Arc™ GPU ecosystem.  
-It delivers a fluid **graphical interface** for creators and a **robust CLI** for power users who automate.
+ArtTic-LAB is a **modern, clean, and powerful** AI image generation suite, meticulously crafted for the Intel® Arc™ hardware ecosystem.
+It provides a beautiful **custom graphical UI** as the primary experience, with a **robust CLI** as an alternative for scripting and automation.
 
-This isn’t just a wrapper — it’s a ground-up application designed for **speed, aesthetics, and a frictionless creative workflow**.  
-With full support for models from **Stable Diffusion 1.5 → SDXL → SD3 → FLUX**, ArtTic-LAB is the definitive creative tool for ARC GPU users. ✨
+This isn’t just a wrapper — it’s a ground-up application focused on **performance, aesthetics, and a frictionless user experience**.
+With full support for models from **Stable Diffusion 1.5 → SDXL → SD3 → FLUX**, ArtTic-LAB is the definitive creative tool for ARC users. ✨
 
 ---
 
@@ -37,97 +33,48 @@ With full support for models from **Stable Diffusion 1.5 → SDXL → SD3 → FL
 
 ArtTic-LAB adapts to your preferred workflow — visual or terminal-based.
 
-| GUI (Light)                               | GUI (Dark)                              | CLI                               |
-| ----------------------------------------- | --------------------------------------- | --------------------------------- |
-| ![Light](assets/ArtTic-LAB-GUI-Light.png) | ![Dark](assets/ArtTic-LAB-GUI-Dark.png) | ![CLI](assets/ArtTic-LAB-CLI.png) |
-| Light mode interface                      | Dark mode interface                     | Terminal interface                |
+<div style="display: flex; justify-content: center; align-items: center; gap: 20px; flex-wrap: wrap;">
+  <div style="text-align: center;">
+    <p>GUI (Light)</p>
+    <img src="assets/ArtTic-LAB-GUI-Light.png" style="width: 300px; border-radius: 8px;">
+  </div>
+  <div style="text-align: center;">
+    <p>GUI (Dark)</p>
+    <img src="assets/ArtTic-LAB-GUI-Dark.png" style="width: 300px; border-radius: 8px;">
+  </div>
+  <div style="text-align: center;">
+    <p>The CLI</p>
+    <img src="assets/ArtTic-LAB-CLI.png" style="width: 300px; border-radius: 8px;">
+  </div>
+</div>
+
 
 ---
 
-## ⚙️ Feature Deep Dive
+## 🔬 Feature Deep Dive
 
-| Category                       | Highlights                                                                                                                                                               |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Engineered for Speed 🏎️**    | - **IPEX Optimization:** Intel® Extension for PyTorch optimizes UNet & VAE.<br>- **Mixed Precision:** Runs in `bfloat16` for ~2× faster performance & ~50% VRAM savings. |
-| **Intelligent Pipeline 🧠**    | - Auto-detects architecture (SD1.5 → SD3 → FLUX).<br>- Predicts VRAM-safe maximum resolution to prevent OOM errors.                                                      |
-| **Total VRAM Control 💧**      | - One-click model unload & VAE tiling for high-res stability.<br>- Adaptive CPU/GPU offloading for efficient memory use.                                                 |
-| **Streamlined for Artists ✨** | - Responsive async UI — no freezes.<br>- Unified node-based interface for full creative control.<br>- Smooth gallery with zoom & drag support.                           |
+We’ve packed ArtTic-LAB with features designed to maximize performance and streamline your creative process.
+
+<div align="center">
+
+| Feature Group                  | Description                                                                                                                                                                                                                                                      |
+| :----------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Engineered for Speed 🏎️**    | **IPEX Optimization:** Uses Intel® Extension for PyTorch (IPEX) to JIT-optimize model components (UNet, VAE) for ARC GPUs.<br>**Mixed Precision:** All generations run in `bfloat16` for ~2× faster performance and ~50% VRAM savings with minimal quality loss. |
+| **Intelligent Pipeline 🧠**    | **Auto Model Detection:** Detects architecture (SD1.5 → SD3 → FLUX) from `.safetensors` and loads the right pipeline automatically.<br>**VRAM-Aware Guidance:** Estimates safe maximum resolution to prevent OOM errors before generating.                       |
+| **Total VRAM Control 💧**      | **Proactive OOM Prevention:** Smart resolution limits and one-click model unload.<br>**VAE Tiling & CPU Offloading:** Generate high-res art with minimal VRAM usage.                                                                                             |
+| **Streamlined for Artists ✨** | **Responsive Async UI:** No freezes while generating.<br>**Unified Image Viewer:** Smooth zoom, drag, and gallery controls.<br>**Full Parameter Control:** Prompt, CFG, LoRA, samplers — all unified in a fluid node-based interface.                            |
+
+</div>
 
 ---
 
 ## 📸 Creations Gallery
 
-> Each image is displayed inside a consistent **512×512** viewport. Images preserve their original aspect ratio and are centered and scaled to fit. This keeps the gallery tidy while avoiding distortion.
-
-<table>
-  <tr>
-    <td align="center">
-      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
-        <img src="assets/demos/1.png" alt="Demo 1" style="max-width:100%;max-height:100%;object-fit:contain;">
-      </div>
-      <p>Demo 1</p>
-    </td>
-    <td align="center">
-      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
-        <img src="assets/demos/2.png" alt="Demo 2" style="max-width:100%;max-height:100%;object-fit:contain;">
-      </div>
-      <p>Demo 2</p>
-    </td>
-    <td align="center">
-      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
-        <img src="assets/demos/3.png" alt="Demo 3" style="max-width:100%;max-height:100%;object-fit:contain;">
-      </div>
-      <p>Demo 3</p>
-    </td>
-  </tr>
-
-  <tr>
-    <td align="center">
-      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
-        <img src="assets/demos/4.png" alt="Demo 4" style="max-width:100%;max-height:100%;object-fit:contain;">
-      </div>
-      <p>Demo 4</p>
-    </td>
-    <td align="center">
-      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
-        <img src="assets/demos/5.png" alt="Demo 5" style="max-width:100%;max-height:100%;object-fit:contain;">
-      </div>
-      <p>Demo 5</p>
-    </td>
-    <td align="center">
-      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
-        <img src="assets/demos/6.png" alt="Demo 6" style="max-width:100%;max-height:100%;object-fit:contain;">
-      </div>
-      <p>Demo 6</p>
-    </td>
-  </tr>
-
-  <tr>
-    <td align="center">
-      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
-        <img src="assets/demos/7.png" alt="Demo 7" style="max-width:100%;max-height:100%;object-fit:contain;">
-      </div>
-      <p>Demo 7</p>
-    </td>
-    <td align="center">
-      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
-        <img src="assets/demos/9.png" alt="Demo 9" style="max-width:100%;max-height:100%;object-fit:contain;">
-      </div>
-      <p>Demo 9</p>
-    </td>
-    <td align="center">
-      <div style="width:78px;height:78px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;border:1px solid #e6e6e6;">
-        <img src="assets/demos/10.png" alt="Demo 10" style="max-width:100%;max-height:100%;object-fit:contain;">
-      </div>
-      <p>Demo 10</p>
-    </td>
-  </tr>
-</table>
-
-> Notes:
->
-> - Each image uses `max-width:100%` and `max-height:100%` inside a fixed `512×512` container to preserve aspect ratio and avoid cropping.
-> - If a demo image is smaller than 512px in either dimension it will be centered at true size; if larger, it will scale down to fit inside the box.
+|                               |                               |                                 |
+| :---------------------------: | :---------------------------: | :-----------------------------: |
+| ![Demo 1](assets/demos/1.png) | ![Demo 2](assets/demos/2.png) |  ![Demo 3](assets/demos/3.png)  |
+| ![Demo 4](assets/demos/4.png) | ![Demo 5](assets/demos/5.png) |  ![Demo 6](assets/demos/6.png)  |
+| ![Demo 7](assets/demos/7.png) | ![Demo 9](assets/demos/9.png) | ![Demo 10](assets/demos/10.png) |
 
 ---
 
@@ -138,23 +85,23 @@ Launch your personal AI art studio in three simple steps.
 ### 1️⃣ Prerequisites
 
 - Install **Miniconda** or **Miniforge**.
-- Reopen your terminal to ensure `conda` is available.
+- After installation, **reopen your terminal** to ensure `conda` is available.
 
 ### 2️⃣ Installation
 
 Download and unzip this project, then run the one-time installer:
 
 - **Windows 🪟:** `install.bat`
-- **Linux/macOS 🐧:** `chmod +x install.sh && ./install.sh`
+- **Linux/macOS 🐧:** `chmod +x ./install.sh && ./install.sh`
 
-### 3️⃣ Launch & Create
+### 3️⃣ Launch & Create!
 
-Start ArtTic-LAB:
+Start the server:
 
 - **Windows:** `start.bat`
 - **Linux/macOS:** `./start.sh`
 
-Open your browser at `http://127.0.0.1:7860`.
+Then open the provided local URL (e.g. `http://127.0.0.1:7860`) in your browser.
 
 <details>
 <summary><strong>👉 Optional Launch Arguments</strong></summary>
