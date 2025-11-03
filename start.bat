@@ -1,91 +1,85 @@
 @echo off
-setlocal enabledelayedexpansion
-
-REM ArtTic-LAB Launcher for Windows
+setlocal
 title ArtTic-LAB
 
-ECHO [INFO] Preparing to launch ArtTic-LAB...
+echo [INFO] Preparing to launch ArtTic-LAB...
 
-REM =======================================================
-REM 1. FIND CONDA INSTALLATION
-REM    Searches for Conda in PATH first, then in common default locations.
-REM =======================================================
-SET "CONDA_BASE_PATH="
-where conda.exe >nul 2>nul && (FOR /F "delims=" %%i IN ('where conda.exe') DO SET "CONDA_EXE_PATH=%%i" & GOTO FoundConda)
+rem --- 1. Find Conda Installation ---
+set "CONDA_BASE_PATH="
+where conda.exe >nul 2>nul && (for /f "delims=" %%i in ('where conda.exe') do set "CONDA_EXE_PATH=%%i" & goto FoundCondaPath)
 
-REM --- Check User Paths ---
-IF EXIST "%USERPROFILE%\miniconda3\condabin\conda.bat" SET "CONDA_BASE_PATH=%USERPROFILE%\miniconda3" & GOTO FoundConda
-IF EXIST "%USERPROFILE%\anaconda3\condabin\conda.bat" SET "CONDA_BASE_PATH=%USERPROFILE%\anaconda3" & GOTO FoundConda
-REM -- Added Miniforge User Path --
-IF EXIST "%USERPROFILE%\AppData\Local\miniforge3\condabin\conda.bat" SET "CONDA_BASE_PATH=%USERPROFILE%\AppData\Local\miniforge3" & GOTO FoundConda
+rem Check User Paths
+if exist "%USERPROFILE%\miniconda3\condabin\conda.bat" set "CONDA_BASE_PATH=%USERPROFILE%\miniconda3" & goto FoundCondaPath
+if exist "%USERPROFILE%\anaconda3\condabin\conda.bat" set "CONDA_BASE_PATH=%USERPROFILE%\anaconda3" & goto FoundCondaPath
+if exist "%USERPROFILE%\AppData\Local\miniforge3\condabin\conda.bat" set "CONDA_BASE_PATH=%USERPROFILE%\AppData\Local\miniforge3" & goto FoundCondaPath
 
-REM --- Check System Paths ---
-IF EXIST "%ProgramData%\Miniconda3\condabin\conda.bat" SET "CONDA_BASE_PATH=%ProgramData%\Miniconda3" & GOTO FoundConda
-IF EXIST "%ProgramData%\Anaconda3\condabin\conda.bat" SET "CONDA_BASE_PATH=%ProgramData%\Anaconda3" & GOTO FoundConda
-REM -- Added Miniforge System Path --
-IF EXIST "%ProgramData%\Miniforge3\condabin\conda.bat" SET "CONDA_BASE_PATH=%ProgramData%\Miniforge3" & GOTO FoundConda
+rem Check System Paths
+if exist "%ProgramData%\Miniconda3\condabin\conda.bat" set "CONDA_BASE_PATH=%ProgramData%\Miniconda3" & goto FoundCondaPath
+if exist "%ProgramData%\Anaconda3\condabin\conda.bat" set "CONDA_BASE_PATH=%ProgramData%\Anaconda3" & goto FoundCondaPath
+if exist "%ProgramData%\Miniforge3\condabin\conda.bat" set "CONDA_BASE_PATH=%ProgramData%\Miniforge3" & goto FoundCondaPath
 
-GOTO NoConda
+goto NoConda
 
-:FoundConda
-IF NOT DEFINED CONDA_BASE_PATH ( FOR %%i IN ("%CONDA_EXE_PATH%") DO SET "CONDA_SCRIPTS_DIR=%%~dpi" & FOR %%j IN ("!CONDA_SCRIPTS_DIR!..") DO SET "CONDA_BASE_PATH=%%~fj" )
-ECHO [INFO] Conda found at: %CONDA_BASE_PATH%
+:FoundCondaPath
+if not defined CONDA_BASE_PATH (
+    for %%i in ("%CONDA_EXE_PATH%") do (
+        set "CONDA_SCRIPTS_DIR=%%~dpi"
+        for %%j in ("!CONDA_SCRIPTS_DIR!..") do set "CONDA_BASE_PATH=%%~fj"
+    )
+)
+echo [INFO] Conda found at: %CONDA_BASE_PATH%
 
-REM =======================================================
-REM 2. INITIALIZE CONDA & VERIFY ENVIRONMENT
-REM =======================================================
+rem --- 2. Initialize Conda & Verify Environment ---
 call "%CONDA_BASE_PATH%\Scripts\activate.bat"
-IF %ERRORLEVEL% NEQ 0 GOTO InitFail
+if %errorlevel% neq 0 goto InitFail
 
-ECHO [INFO] Checking for 'ArtTic-LAB' environment...
+echo [INFO] Checking for 'ArtTic-LAB' environment...
 conda env list | findstr /I /B "ArtTic-LAB " >nul
-IF %ERRORLEVEL% NEQ 0 GOTO EnvNotFound
+if %errorlevel% neq 0 goto EnvNotFound
 
-ECHO [INFO] Activating environment...
+echo [INFO] Activating environment...
 call conda activate ArtTic-LAB
-IF %ERRORLEVEL% NEQ 0 GOTO ActivateFail
+if %errorlevel% neq 0 goto ActivateFail
 
-ECHO [SUCCESS] Environment activated. Launching application...
-ECHO.
-ECHO =======================================================
-ECHO             Launching ArtTic-LAB
-ECHO =======================================================
-ECHO.
+rem --- 3. Launch Application ---
+echo [SUCCESS] Environment activated. Launching application...
+echo.
+echo =======================================================
+echo              Launching ArtTic-LAB
+echo =======================================================
+echo.
 
-REM =======================================================
-REM 3. LAUNCH THE APPLICATION
-REM =======================================================
 python app.py %*
 
-ECHO.
-ECHO =======================================================
-ECHO ArtTic-LAB has closed.
-ECHO =======================================================
-GOTO End
+echo.
+echo =======================================================
+echo ArtTic-LAB has closed.
+echo =======================================================
+goto End
 
 :NoConda
-ECHO.
-ECHO [ERROR] Conda installation not found.
-ECHO Please ensure Miniconda, Anaconda, or Miniforge is installed and run install.bat.
-GOTO End
+echo.
+echo [ERROR] Conda installation not found.
+echo Please ensure Miniconda, Anaconda, or Miniforge is installed and run install.bat.
+goto End
 
 :InitFail
-ECHO.
-ECHO [ERROR] Failed to initialize the Conda command environment.
-ECHO Your Conda installation might be corrupted.
-GOTO End
+echo.
+echo [ERROR] Failed to initialize the Conda command environment.
+echo Your Conda installation might be corrupted.
+goto End
 
 :EnvNotFound
-ECHO.
-ECHO [ERROR] The 'ArtTic-LAB' environment was not found.
-ECHO Please run the 'install.bat' script first to set it up.
-GOTO End
+echo.
+echo [ERROR] The 'ArtTic-LAB' environment was not found.
+echo Please run the 'install.bat' script first to set it up.
+goto End
 
 :ActivateFail
-ECHO.
-ECHO [ERROR] Failed to activate the 'ArtTic-LAB' environment.
-ECHO The environment may be corrupted. Please try running 'install.bat' again.
-GOTO End
+echo.
+echo [ERROR] Failed to activate the 'ArtTic-LAB' environment.
+echo The environment may be corrupted. Please try running 'install.bat' again.
+goto End
 
 :End
 echo.
