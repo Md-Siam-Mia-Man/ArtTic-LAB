@@ -44,6 +44,7 @@ app_state = {
 }
 
 APP_LOGGER_NAME = "arttic_lab"
+RESTART_EXIT_CODE = 21
 logger = logging.getLogger(APP_LOGGER_NAME)
 SCHEDULER_MAP = {
     "Euler A": EulerAncestralDiscreteScheduler,
@@ -53,6 +54,13 @@ SCHEDULER_MAP = {
     "Euler": EulerDiscreteScheduler,
     "LMS": LMSDiscreteScheduler,
 }
+
+
+def get_app_status():
+    return {
+        "is_model_loaded": app_state["is_model_loaded"],
+        "status_message": app_state["status_message"],
+    }
 
 
 def get_config():
@@ -552,20 +560,8 @@ def get_image_metadata(filename: str):
 
 
 def restart_backend():
-    logger.info("Restart command received. Restarting application...")
-    try:
-        args = [sys.executable] + sys.argv
-
-        if sys.platform == "win32":
-            subprocess.Popen(args, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
-        else:
-            subprocess.Popen(args)
-
-        logger.info("New process started. Shutting down old process.")
-        sys.exit(0)
-    except Exception as e:
-        logger.error(f"Error restarting backend: {e}")
-        return {"status": "error", "message": str(e)}
+    logger.info("Restart command received. Exiting with restart code...")
+    sys.exit(RESTART_EXIT_CODE)
 
 
 def clear_cache():
