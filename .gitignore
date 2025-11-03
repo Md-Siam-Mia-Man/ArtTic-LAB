@@ -146,3 +146,4 @@ web/__pycache__/
 /models
 /outputs
 /loras
+node_modules/
