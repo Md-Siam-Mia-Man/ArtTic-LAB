@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 rem --- Configuration ---
 set "ENV_NAME=ArtTic-LAB"
@@ -45,7 +45,7 @@ if %errorlevel% neq 0 (
 rem 3. Handle environment creation
 echo.
 echo [INFO] Checking for existing "%ENV_NAME%" environment...
-conda env list | findstr /B /C:"%ENV_NAME% " >nul
+call conda env list | findstr /B /C:"%ENV_NAME% " >nul
 if %errorlevel% equ 0 (
     echo [WARNING] Environment "%ENV_NAME%" already exists.
     choice /c yn /m "Do you want to remove and reinstall it? (y/n):"
@@ -53,13 +53,13 @@ if %errorlevel% equ 0 (
         echo [INFO] Skipping environment creation. Will update packages.
     ) else (
         echo [INFO] Removing previous version of "%ENV_NAME%"...
-        conda env remove --name "%ENV_NAME%" -y >nul 2>&1
+        call conda env remove --name "%ENV_NAME%" -y >nul 2>&1
         echo [INFO] Creating new Conda environment...
-        conda create --name "%ENV_NAME%" python=%PYTHON_VERSION% -y
+        call conda create --name "%ENV_NAME%" python=%PYTHON_VERSION% -y
     )
 ) else (
     echo [INFO] Creating new Conda environment...
-    conda create --name "%ENV_NAME%" python=%PYTHON_VERSION% -y
+    call conda create --name "%ENV_NAME%" python=%PYTHON_VERSION% -y
 )
 
 rem 4. Activate environment and install packages
@@ -76,8 +76,17 @@ pip install -r requirements.txt
 
 echo.
 echo [INFO] Automatically detecting hardware for PyTorch installation...
-set "DETECT_COMMAND=python -c "from torchruntime.device_db import get_gpus; from torchruntime.platform_detection import get_torch_platform; print(get_torch_platform(get_gpus()))""
-FOR /F "tokens=*" %%i IN ('%DETECT_COMMAND%') DO SET "TORCH_PLATFORM=%%i"
+
+rem Create a temporary python script to avoid batch nesting quote issues
+(
+echo from torchruntime.device_db import get_gpus
+echo from torchruntime.platform_detection import get_torch_platform
+echo print(get_torch_platform(get_gpus(^)^)^)
+) > _detect_hw.py
+
+set "TORCH_PLATFORM="
+for /f "tokens=*" %%i in ('python _detect_hw.py') do set "TORCH_PLATFORM=%%i"
+del _detect_hw.py
 
 if not defined TORCH_PLATFORM (
     echo [ERROR] torchruntime failed to detect hardware. Please check your drivers.
@@ -109,9 +118,13 @@ if %errorlevel% neq 0 (
     echo Skipping automatic installation of UI icon packages.
     echo The UI will still work but will fetch icons from the web.
 ) else (
-    pushd web
-    call npm install
-    popd
+    if exist "web" (
+        pushd web
+        call npm install
+        popd
+    ) else (
+        echo [WARNING] 'web' directory not found. Skipping npm install.
+    )
 )
 
 rem 6. Handle Hugging Face Login
@@ -132,16 +145,13 @@ if /i "%login_choice%"=="y" (
     huggingface-cli login
     echo.
     echo [IMPORTANT] Remember to visit the model pages on the
-    echo Hugging Face website to accept their license agreements:
-    echo - SD3: https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers
-    echo - FLUX: https://huggingface.co/black-forest-labs/FLUX.1-dev
+    echo Hugging Face website to accept their license agreements.
     echo.
 ) else (
     echo.
     echo [INFO] Skipping Hugging Face login.
     echo You can log in later by opening a terminal, running
     echo 'conda activate %ENV_NAME%' and then 'huggingface-cli login'.
-    echo Note: SD3 and FLUX models will not work until you do.
 )
 
 echo.
