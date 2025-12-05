@@ -1,5 +1,6 @@
+# pipelines/sd3_pipeline.py
 import torch
-from diffusers import StableDiffusion3Pipeline, StableDiffusion3Img2ImgPipeline
+from diffusers import StableDiffusion3Pipeline
 from .base_pipeline import ArtTicPipeline
 import logging
 
@@ -9,15 +10,10 @@ SD3_BASE_MODEL_REPO = "stabilityai/stable-diffusion-3-medium-diffusers"
 
 
 class SD3Pipeline(ArtTicPipeline):
-    def __init__(self, model_path, dtype=None):
-        super().__init__(model_path, dtype)
-        self.t2i_class = StableDiffusion3Pipeline
-        self.i2i_class = StableDiffusion3Img2ImgPipeline
-
     def load_pipeline(self, progress):
         progress(0.2, "Loading base SD3 components from Hugging Face...")
         try:
-            self.pipe = self.t2i_class.from_pretrained(
+            self.pipe = StableDiffusion3Pipeline.from_pretrained(
                 SD3_BASE_MODEL_REPO,
                 torch_dtype=self.dtype,
                 use_safetensors=True,

@@ -1,16 +1,12 @@
-from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline
+# pipelines/sd15_pipeline.py
+from diffusers import StableDiffusionPipeline
 from .base_pipeline import ArtTicPipeline
 
 
 class SD15Pipeline(ArtTicPipeline):
-    def __init__(self, model_path, dtype=None):
-        super().__init__(model_path, dtype)
-        self.t2i_class = StableDiffusionPipeline
-        self.i2i_class = StableDiffusionImg2ImgPipeline
-
     def load_pipeline(self, progress):
         progress(0.2, "Loading StableDiffusionPipeline...")
-        self.pipe = self.t2i_class.from_single_file(
+        self.pipe = StableDiffusionPipeline.from_single_file(
             self.model_path,
             torch_dtype=self.dtype,
             use_safetensors=True,
